@@ -44,11 +44,11 @@ pub struct Lib {
 }
 
 pub struct DynamicReload {
-    libs: Vec<Lib>, 
-    watcher: Option<RecommendedWatcher>,
+    _libs: Vec<Lib>, 
+    _watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'static str>,
-    watch_recv: Receiver<Event>,
+    _watch_recv: Receiver<Event>,
 }
 
 pub enum Search {
@@ -62,17 +62,19 @@ pub enum UsePlatformName {
     Yes
 }
 
+// Test
+
 impl DynamicReload {
 
     ///
     ///
-    pub fn new(search_paths: Option<Vec<&'static str>>, shadow_dir: Option<&'static str>, search: Search) -> DynamicReload {
+    pub fn new(search_paths: Option<Vec<&'static str>>, shadow_dir: Option<&'static str>, _search: Search) -> DynamicReload {
         let (tx, rx) = channel();
         DynamicReload {
-            libs: Vec::new(),
+            _libs: Vec::new(),
+            _watcher: Self::get_watcher(tx),
             shadow_dir: Self::get_temp_dir(shadow_dir),
-            watch_recv: rx, 
-            watcher: Self::get_watcher(tx),
+            _watch_recv: rx, 
             search_paths: Self::get_search_paths(search_paths),
         }
     }
@@ -122,7 +124,7 @@ impl DynamicReload {
     ///
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
-    pub fn update_with_callback<F, T>(&self, before_update: F, after_update: F, data: T) where F : Fn(T, Rc<Lib>) {
+    pub fn update_with_callback<F, T>(&self, _before_update: F, _after_update: F, _data: T) where F : Fn(T, Rc<Lib>) {
 
     }
 
@@ -170,7 +172,7 @@ impl DynamicReload {
             })),
             Err(e) => {
                 let mut error = "".to_string();
-                write!(error, "Unable to load library {:?}", e);
+                write!(error, "Unable to load library {:?}", e).unwrap();
                 Err(error)
             }
         }
@@ -219,7 +221,7 @@ impl DynamicReload {
         match Self::get_parent_dir(path) {
             Some(p) => {
                 let new_path = Path::new(&p).join(lib_name);
-                if let Some(f) = Self::is_file(&new_path) {
+                if Self::is_file(&new_path).is_some() {
                     return Some(new_path);
                 }
                 Self::search_backwards_from_file(&p, lib_name)
@@ -250,7 +252,13 @@ impl DynamicReload {
 
     fn is_file(path: &PathBuf) -> Option<PathBuf> {
         match fs::metadata(path) {
-            Ok(md) => Some(path.clone()),
+            Ok(md) => {
+                if md.is_file() {
+                    Some(path.clone())
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -314,8 +322,8 @@ impl DynamicReload {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc::{channel, Receiver, Sender};
-    use std::path::{Path, PathBuf};
+    use std::sync::mpsc::channel;
+    use std::path::Path;
     use std::env;
 
     #[test]
