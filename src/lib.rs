@@ -44,11 +44,11 @@ pub struct Lib {
 }
 
 pub struct DynamicReload {
-    _libs: Vec<Lib>, 
-    _watcher: Option<RecommendedWatcher>,
+    libs: Vec<Rc<Lib>>, 
+    watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'static str>,
-    _watch_recv: Receiver<Event>,
+    watch_recv: Receiver<Event>,
 }
 
 pub enum Search {
@@ -71,10 +71,10 @@ impl DynamicReload {
     pub fn new(search_paths: Option<Vec<&'static str>>, shadow_dir: Option<&'static str>, _search: Search) -> DynamicReload {
         let (tx, rx) = channel();
         DynamicReload {
-            _libs: Vec::new(),
-            _watcher: Self::get_watcher(tx),
+            libs: Vec::new(),
+            watcher: Self::get_watcher(tx),
             shadow_dir: Self::get_temp_dir(shadow_dir),
-            _watch_recv: rx, 
+            watch_recv: rx, 
             search_paths: Self::get_search_paths(search_paths),
         }
     }
@@ -102,12 +102,18 @@ impl DynamicReload {
     /// ```
     ///
     pub fn add_library(&mut self, name: &str, name_format: UsePlatformName) -> Result<Rc<Lib>, String> {
-        if let Some(path) = Self::search_dirs(self, name, name_format) {
-            Self::load_library(self, &path)
-        } else {
-            let mut t = "Unable to find ".to_string();
-            t.push_str(name);
-            Err(t)
+        match Self::try_load_library(self, name, name_format) {
+            Ok(lib) => {
+                if let Some(w) = self.watcher.as_mut() {
+                    if let Some(path) = lib.original_path.as_ref() {
+                        let _ = w.watch(path);
+                    }
+                }
+                // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
+                self.libs.push(lib.clone());
+                Ok(lib)
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -124,8 +130,11 @@ impl DynamicReload {
     ///
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
-    pub fn update_with_callback<F, T>(&self, _before_update: F, _after_update: F, _data: T) where F : Fn(T, Rc<Lib>) {
-
+    pub fn update_with_callback<F, T>(&mut self, before_update: F, after_update: F, data: T) where F : Fn(T, &Rc<Lib>) {
+        match self.watch_recv.try_recv() {
+            Ok(file) => Self::reload_libs(self, file.path.as_ref().unwrap(), before_update, after_update, data),
+            _ => (),
+        }
     }
 
     ///
@@ -133,17 +142,48 @@ impl DynamicReload {
     ///
     ///
     pub fn update(&self) {
-        /*
-           match self.watch_recv.try_recv() {
-           Ok(file) => {
-           plugin_handler.reload_plugin(file.path.as_ref().unwrap());
-           }
-           _ => (),
-           }
-           */
     }
 
-    fn load_library(&mut self, full_path: &PathBuf) -> Result<Rc<Lib>, String> {
+    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, before_update: F, after_update: F, data: T) where F : Fn(T, &Rc<Lib>) {
+        let len = self.libs.len();
+        for i in (0..len).rev() {
+            if Self::should_reload(file_path, &self.libs[i]) {
+                Self::reload_lib(self, i, file_path, before_update, after_update, data);
+            }
+        }
+    }
+
+    fn reload_lib<F, T>(&mut self, index: usize, file_path: &PathBuf, before_update: F, after_update: F, data: T) 
+        where F : Fn(T, &Rc<Lib>) {
+        before_update(data, &self.libs[index]);
+        self.libs.swap_remove(index);
+
+        match Self::load_library(self, file_path) {
+            Ok(lib) => {
+                self.libs.push(lib.clone());
+                after_update(data, &lib);
+            }
+
+            // What should we really do here?
+            Err(err) => {
+                println!("Unable to reload lib {:?} err {:?}", file_path, err);
+            }
+        }
+    }
+
+
+    fn try_load_library(&self, name: &str, name_format: UsePlatformName) -> Result<Rc<Lib>, String> {
+        if let Some(path) = Self::search_dirs(self, name, name_format) {
+            Self::load_library(self, &path)
+        } else {
+            let mut t = "Unable to find ".to_string();
+            t.push_str(name);
+            Err(t)
+        }
+    }
+
+
+    fn load_library(&self, full_path: &PathBuf) -> Result<Rc<Lib>, String> {
         let path;
         let original_path;
 
@@ -176,6 +216,20 @@ impl DynamicReload {
                 Err(error)
             }
         }
+    }
+
+    fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
+        if let Some(p) = lib.original_path.as_ref() {
+            if reload_path.to_str().unwrap().contains(p.to_str().unwrap()) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn remove_library(&mut self, path: &PathBuf) {
+
     }
 
     fn search_dirs(&self, name: &str, name_format: UsePlatformName) -> Option<PathBuf> {
