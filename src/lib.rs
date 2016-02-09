@@ -130,7 +130,7 @@ impl DynamicReload {
     ///
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
-    pub fn update_with_callback<F, T>(&mut self, before_update: F, after_update: F, data: T) where F : Fn(T, &Rc<Lib>) {
+    pub fn update_with_callback<F, T>(&mut self, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
         match self.watch_recv.try_recv() {
             Ok(file) => Self::reload_libs(self, file.path.as_ref().unwrap(), before_update, after_update, data),
             _ => (),
@@ -144,7 +144,7 @@ impl DynamicReload {
     pub fn update(&self) {
     }
 
-    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, before_update: F, after_update: F, data: T) where F : Fn(T, &Rc<Lib>) {
+    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
         let len = self.libs.len();
         for i in (0..len).rev() {
             if Self::should_reload(file_path, &self.libs[i]) {
@@ -153,8 +153,7 @@ impl DynamicReload {
         }
     }
 
-    fn reload_lib<F, T>(&mut self, index: usize, file_path: &PathBuf, before_update: F, after_update: F, data: T) 
-        where F : Fn(T, &Rc<Lib>) {
+    fn reload_lib<F, T>(&mut self, index: usize, file_path: &PathBuf, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
         before_update(data, &self.libs[index]);
         self.libs.swap_remove(index);
 
@@ -208,7 +207,7 @@ impl DynamicReload {
             Ok(l) => Ok(Rc::new(Lib {
                 original_path: org_path,
                 loaded_path: path, 
-                lib: l 
+            lib: l 
             })),
             Err(e) => {
                 let mut error = "".to_string();
@@ -226,10 +225,6 @@ impl DynamicReload {
         }
 
         false
-    }
-
-    fn remove_library(&mut self, path: &PathBuf) {
-
     }
 
     fn search_dirs(&self, name: &str, name_format: UsePlatformName) -> Option<PathBuf> {
