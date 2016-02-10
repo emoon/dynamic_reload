@@ -3,6 +3,7 @@ extern crate notify;
 extern crate libloading;
 extern crate tempdir;
 
+
 use libloading::Library;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -14,6 +15,7 @@ use std::thread;
 use std::fs;
 use std::env;
 use std::fmt::Write;
+
 
 /// Formats dll name on Windows ("test_foo" -> "test_foo.dll")
 #[cfg(target_os="windows")]
@@ -371,9 +373,11 @@ impl DynamicReload {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use std::sync::mpsc::channel;
     use std::path::Path;
     use std::env;
+    use std::str;
 
     #[test]
     fn test_search_paths_none() {
@@ -444,4 +448,21 @@ mod tests {
         let mut dr = DynamicReload::new(None, None, Search::Default); 
         assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err()); 
     }
+
+    /*
+    #[test]
+    fn test_add_shared_lib_ok() {
+        let t = Command::new("rustc")
+                .arg("../../src/test_shared.rs")
+                .arg("--crate-name test_shared")
+                .arg("--crate-type dylib")
+                .arg("--out-dir .")
+                .output()
+                .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
+        panic!("command {}", str::from_utf8(&t.stderr).unwrap());
+
+        //let mut dr = DynamicReload::new(None, None, Search::Default); 
+        //assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err()); 
+    }
+    */
 }
