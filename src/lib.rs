@@ -438,4 +438,10 @@ mod tests {
     fn test_search_backwards_from_file_fail() {
         assert!(DynamicReload::search_backwards_from_exe(&"_no_such_file".to_string()).is_none());
     }
+
+    #[test]
+    fn test_add_library_fail() {
+        let mut dr = DynamicReload::new(None, None, Search::Default); 
+        assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err()); 
+    }
 }
