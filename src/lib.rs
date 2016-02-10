@@ -17,28 +17,6 @@ use std::env;
 use std::fmt::Write;
 
 
-/// Formats dll name on Windows ("test_foo" -> "test_foo.dll")
-#[cfg(target_os="windows")]
-fn get_dynamiclib_name(name: &str) -> String {
-    format!("{}.dll", name)
-}
-
-/// Formats dll name on Mac ("test_foo" -> "libtest_foo.dylib")
-#[cfg(target_os="macos")]
-fn get_dynamiclib_name(name: &str) -> String {
-    format!("lib{}.dylib", name)
-}
-
-/// Formats dll name on *nix ("test_foo" -> "libtest_foo.so")
-#[cfg(any(target_os="linux",
-          target_os="freebsd",
-          target_os="dragonfly",
-          target_os="netbsd",
-          target_os="openbsd"))]
-fn get_dynamiclib_name(name: &str) -> String {
-    format!("lib{}.so", name)
-}
-
 pub struct Lib {
     pub lib: Library,
     pub loaded_path: PathBuf,
@@ -46,7 +24,7 @@ pub struct Lib {
 }
 
 pub struct DynamicReload {
-    libs: Vec<Rc<Lib>>, 
+    libs: Vec<Rc<Lib>>,
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'static str>,
@@ -61,22 +39,24 @@ pub enum Search {
 #[derive(PartialEq)]
 pub enum UsePlatformName {
     No,
-    Yes
+    Yes,
 }
 
 // Test
 
 impl DynamicReload {
-
     ///
     ///
-    pub fn new(search_paths: Option<Vec<&'static str>>, shadow_dir: Option<&'static str>, _search: Search) -> DynamicReload {
+    pub fn new(search_paths: Option<Vec<&'static str>>,
+               shadow_dir: Option<&'static str>,
+               _search: Search)
+               -> DynamicReload {
         let (tx, rx) = channel();
         DynamicReload {
             libs: Vec::new(),
             watcher: Self::get_watcher(tx),
             shadow_dir: Self::get_temp_dir(shadow_dir),
-            watch_recv: rx, 
+            watch_recv: rx,
             search_paths: Self::get_search_paths(search_paths),
         }
     }
@@ -103,7 +83,10 @@ impl DynamicReload {
     /// 4. Serach backwards from executable if Backwards has been set in [new](struct.DynamicReload.html#method.new) 
     /// ```
     ///
-    pub fn add_library(&mut self, name: &str, name_format: UsePlatformName) -> Result<Rc<Lib>, String> {
+    pub fn add_library(&mut self,
+                       name: &str,
+                       name_format: UsePlatformName)
+                       -> Result<Rc<Lib>, String> {
         match Self::try_load_library(self, name, name_format) {
             Ok(lib) => {
                 if let Some(w) = self.watcher.as_mut() {
@@ -132,9 +115,20 @@ impl DynamicReload {
     ///
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
-    pub fn update_with_callback<F, T>(&mut self, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
+    pub fn update_with_callback<F, T>(&mut self,
+                                      ref before_update: F,
+                                      ref after_update: F,
+                                      data: &mut T)
+        where F: Fn(&mut T, &Rc<Lib>)
+    {
         match self.watch_recv.try_recv() {
-            Ok(file) => Self::reload_libs(self, file.path.as_ref().unwrap(), before_update, after_update, data),
+            Ok(file) => {
+                Self::reload_libs(self,
+                                  file.path.as_ref().unwrap(),
+                                  before_update,
+                                  after_update,
+                                  data)
+            }
             _ => (),
         }
     }
@@ -143,10 +137,15 @@ impl DynamicReload {
     /// Updates the DynamicReload handler and reloads the dynamic libraries if needed
     ///
     ///
-    pub fn update(&self) {
-    }
+    pub fn update(&self) {}
 
-    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
+    fn reload_libs<F, T>(&mut self,
+                         file_path: &PathBuf,
+                         ref before_update: F,
+                         ref after_update: F,
+                         data: &mut T)
+        where F: Fn(&mut T, &Rc<Lib>)
+    {
         let len = self.libs.len();
         for i in (0..len).rev() {
             if Self::should_reload(file_path, &self.libs[i]) {
@@ -155,7 +154,14 @@ impl DynamicReload {
         }
     }
 
-    fn reload_lib<F, T>(&mut self, index: usize, file_path: &PathBuf, ref before_update: F, ref after_update: F, data: &mut T) where F : Fn(&mut T, &Rc<Lib>) {
+    fn reload_lib<F, T>(&mut self,
+                        index: usize,
+                        file_path: &PathBuf,
+                        ref before_update: F,
+                        ref after_update: F,
+                        data: &mut T)
+        where F: Fn(&mut T, &Rc<Lib>)
+    {
         before_update(data, &self.libs[index]);
         self.libs.swap_remove(index);
 
@@ -173,7 +179,10 @@ impl DynamicReload {
     }
 
 
-    fn try_load_library(&self, name: &str, name_format: UsePlatformName) -> Result<Rc<Lib>, String> {
+    fn try_load_library(&self,
+                        name: &str,
+                        name_format: UsePlatformName)
+                        -> Result<Rc<Lib>, String> {
         if let Some(path) = Self::search_dirs(self, name, name_format) {
             Self::load_library(self, &path)
         } else {
@@ -201,16 +210,18 @@ impl DynamicReload {
             path = full_path.clone();
         }
 
-        Self::init_library(original_path, path) 
+        Self::init_library(original_path, path)
     }
 
     fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Rc<Lib>, String> {
         match Library::new(&path) {
-            Ok(l) => Ok(Rc::new(Lib {
-                original_path: org_path,
-                loaded_path: path, 
-            lib: l 
-            })),
+            Ok(l) => {
+                Ok(Rc::new(Lib {
+                    original_path: org_path,
+                    loaded_path: path,
+                    lib: l,
+                }))
+            }
             Err(e) => {
                 let mut error = "".to_string();
                 write!(error, "Unable to load library {:?}", e).unwrap();
@@ -230,9 +241,9 @@ impl DynamicReload {
     }
 
     fn search_dirs(&self, name: &str, name_format: UsePlatformName) -> Option<PathBuf> {
-        let lib_name = Self::get_library_name(name, name_format); 
+        let lib_name = Self::get_library_name(name, name_format);
 
-        // 1. Serach the current directory 
+        // 1. Serach the current directory
         if let Some(path) = Self::search_current_dir(&lib_name) {
             return Some(path);
         }
@@ -276,7 +287,7 @@ impl DynamicReload {
                     return Some(new_path);
                 }
                 Self::search_backwards_from_file(&p, lib_name)
-            },
+            }
             _ => None,
         }
     }
@@ -314,7 +325,6 @@ impl DynamicReload {
         }
     }
 
-    //
     // In some cases when a file has been set that it's reloaded it's actually not possible
     // to read from it directly so this code does some testing first to ensure we
     // can actually read from it (by using metadata which does a stat on the file)
@@ -325,10 +335,10 @@ impl DynamicReload {
         for _ in 0..10 {
             match fs::metadata(src) {
                 Ok(file) => {
-                    let len = file.len(); 
+                    let len = file.len();
                     if len > 0 {
                         fs::copy(&src, &dest).unwrap();
-                        //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
+                        // println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
                         return true;
                     }
                 }
@@ -345,7 +355,9 @@ impl DynamicReload {
         match Watcher::new(tx) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
-                println!("Unable to create file watcher, no dynamic reloading will be done, error: {:?}", e);
+                println!("Unable to create file watcher, no dynamic reloading will be done, \
+                          error: {:?}",
+                         e);
                 None
             }
         }
@@ -353,22 +365,41 @@ impl DynamicReload {
 
     pub fn get_search_paths(search_paths: Option<Vec<&'static str>>) -> Vec<&'static str> {
         match search_paths {
-            Some(paths) => {
-                paths.clone()
-            },
+            Some(paths) => paths.clone(),
             None => Vec::new(),
         }
     }
 
     fn get_library_name(name: &str, name_format: UsePlatformName) -> String {
-        if name_format == UsePlatformName::Yes  {
-            get_dynamiclib_name(name)
+        if name_format == UsePlatformName::Yes {
+            Self::get_dynamiclib_name(name)
         } else {
             name.to_string()
         }
     }
-}
 
+    /// Formats dll name on Windows ("test_foo" -> "test_foo.dll")
+    #[cfg(target_os="windows")]
+    fn get_dynamiclib_name(name: &str) -> String {
+        format!("{}.dll", name)
+    }
+
+    /// Formats dll name on Mac ("test_foo" -> "libtest_foo.dylib")
+    #[cfg(target_os="macos")]
+    fn get_dynamiclib_name(name: &str) -> String {
+        format!("lib{}.dylib", name)
+    }
+
+    /// Formats dll name on *nix ("test_foo" -> "libtest_foo.so")
+    #[cfg(any(target_os="linux",
+            target_os="freebsd",
+            target_os="dragonfly",
+            target_os="netbsd",
+            target_os="openbsd"))]
+    fn get_dynamiclib_name(name: &str) -> String {
+        format!("lib{}.so", name)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -377,7 +408,7 @@ mod tests {
     use std::sync::mpsc::channel;
     use std::path::Path;
     use std::env;
-    use std::str;
+    use std::fs;
 
     #[test]
     fn test_search_paths_none() {
@@ -386,7 +417,8 @@ mod tests {
 
     #[test]
     fn test_search_paths_some() {
-        assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(), 2);
+        assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
+                   2);
     }
 
     #[test]
@@ -413,7 +445,8 @@ mod tests {
 
     #[test]
     fn test_is_file_fail() {
-        assert!(DynamicReload::is_file(&Path::new("haz_no_file_with_this_name").to_path_buf()).is_none());
+        assert!(DynamicReload::is_file(&Path::new("haz_no_file_with_this_name").to_path_buf())
+                    .is_none());
     }
 
     #[test]
@@ -424,12 +457,14 @@ mod tests {
     #[test]
     #[cfg(target_os="macos")]
     fn test_get_library_name_mac() {
-        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::Yes), "libfoobar.dylib");
+        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::Yes),
+                   "libfoobar.dylib");
     }
 
     #[test]
     fn test_get_library_name() {
-        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::No), "foobar");
+        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::No),
+                   "foobar");
     }
 
     #[test]
@@ -445,24 +480,32 @@ mod tests {
 
     #[test]
     fn test_add_library_fail() {
-        let mut dr = DynamicReload::new(None, None, Search::Default); 
-        assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err()); 
+        let mut dr = DynamicReload::new(None, None, Search::Default);
+        assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err());
     }
 
-    /*
     #[test]
     fn test_add_shared_lib_ok() {
-        let t = Command::new("rustc")
-                .arg("../../src/test_shared.rs")
-                .arg("--crate-name test_shared")
-                .arg("--crate-type dylib")
-                .arg("--out-dir .")
-                .output()
-                .unwrap_or_else(|e| { panic!("failed to execute process: {}", e) });
-        panic!("command {}", str::from_utf8(&t.stderr).unwrap());
+        let exe_path = env::current_exe().unwrap();
+        let lib_path = exe_path.parent().unwrap();
+        let lib_name = "test_shared";
 
-        //let mut dr = DynamicReload::new(None, None, Search::Default); 
-        //assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err()); 
+        Command::new("rustc")
+            .arg("src/test_shared.rs")
+            .arg("--crate-name")
+            .arg(&lib_name)
+            .arg("--crate-type")
+            .arg("dylib")
+            .arg("--out-dir")
+            .arg(&lib_path)
+            .output()
+            .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+
+        let mut dr = DynamicReload::new(None, None, Search::Default);
+        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+
+        let lib_full_path = Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name));
+
+        let _ = fs::remove_file(lib_full_path);
     }
-    */
 }
