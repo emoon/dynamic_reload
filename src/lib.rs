@@ -116,17 +116,15 @@ impl DynamicReload {
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
     pub fn update_with_callback<F, T>(&mut self,
-                                      ref before_update: F,
-                                      ref after_update: F,
+                                      ref update_call: F,
                                       data: &mut T)
-        where F: Fn(&mut T, &Rc<Lib>)
+        where F: Fn(&mut T, bool, &Rc<Lib>)
     {
         match self.watch_recv.try_recv() {
             Ok(file) => {
                 Self::reload_libs(self,
                                   file.path.as_ref().unwrap(),
-                                  before_update,
-                                  after_update,
+                                  update_call,
                                   data)
             }
             _ => (),
@@ -141,15 +139,14 @@ impl DynamicReload {
 
     fn reload_libs<F, T>(&mut self,
                          file_path: &PathBuf,
-                         ref before_update: F,
-                         ref after_update: F,
+                         ref update_call: F,
                          data: &mut T)
-        where F: Fn(&mut T, &Rc<Lib>)
+        where F: Fn(&mut T, bool, &Rc<Lib>)
     {
         let len = self.libs.len();
         for i in (0..len).rev() {
             if Self::should_reload(file_path, &self.libs[i]) {
-                Self::reload_lib(self, i, file_path, before_update, after_update, data);
+                Self::reload_lib(self, i, file_path, update_call, data);
             }
         }
     }
@@ -157,18 +154,17 @@ impl DynamicReload {
     fn reload_lib<F, T>(&mut self,
                         index: usize,
                         file_path: &PathBuf,
-                        ref before_update: F,
-                        ref after_update: F,
+                        ref update_call: F,
                         data: &mut T)
-        where F: Fn(&mut T, &Rc<Lib>)
+        where F: Fn(&mut T, bool, &Rc<Lib>)
     {
-        before_update(data, &self.libs[index]);
+        update_call(data, true, &self.libs[index]);
         self.libs.swap_remove(index);
 
         match Self::load_library(self, file_path) {
             Ok(lib) => {
                 self.libs.push(lib.clone());
-                after_update(data, &lib);
+                update_call(data, false, &lib);
             }
 
             // What should we really do here?
@@ -406,10 +402,30 @@ mod tests {
     use super::*;
     use std::process::Command;
     use std::sync::mpsc::channel;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::env;
+    use std::thread;
+    use std::time::Duration;
+    use std::rc::Rc;
+    use std::fs;
 
-    fn compile_test_shared_lib() {
+    #[derive(Default)]
+    struct TestNotifyCallback {
+        update_call_done: bool,
+        after_update_done: bool,
+    }
+
+    impl TestNotifyCallback {
+        fn update_call(&mut self, before: bool, _lib: &Rc<Lib>) {
+            if before {
+                self.update_call_done = true;
+            } else {
+                self.after_update_done = true;
+            }
+        }
+    }
+
+    fn compile_test_shared_lib() -> PathBuf {
         let exe_path = env::current_exe().unwrap();
         let lib_path = exe_path.parent().unwrap();
         let lib_name = "test_shared";
@@ -429,6 +445,8 @@ mod tests {
                 .output()
                 .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
         }
+
+        lib_full_path
     }
 
     #[test]
@@ -525,4 +543,33 @@ mod tests {
         let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
         assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
     }
+
+    #[test]
+    fn test_add_shared_update_1() {
+        let mut notify_callback = TestNotifyCallback::default();  
+        let target_path = compile_test_shared_lib();
+        let mut dest_path = Path::new(&target_path).to_path_buf();
+
+        let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
+
+        dest_path.set_file_name("test_file");
+
+        fs::copy(&target_path, &dest_path).unwrap();
+
+        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+
+        for i in 0..10 {
+            dr.update_with_callback(TestNotifyCallback::update_call, &mut notify_callback); 
+
+            if i == 2 {
+                fs::copy(&dest_path, &target_path).unwrap();
+            }
+
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        assert!(notify_callback.update_call_done);
+        assert!(notify_callback.after_update_done);
+    }
+
 }
