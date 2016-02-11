@@ -539,13 +539,19 @@ mod tests {
     }
 
     #[test]
+    fn test_add_shared_lib_fail_load() {
+        let mut dr = DynamicReload::new(None, None, Search::Default);
+        assert!(dr.add_library("Cargo.toml", UsePlatformName::No).is_err());
+    }
+
+    #[test]
     fn test_add_shared_shadow_dir_ok() {
         let dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
         assert!(dr.shadow_dir.is_some());
     }
 
     #[test]
-    fn test_add_shared_update_1() {
+    fn test_add_shared_update() {
         let mut notify_callback = TestNotifyCallback::default();  
         let target_path = compile_test_shared_lib();
         let mut dest_path = Path::new(&target_path).to_path_buf();
@@ -572,4 +578,34 @@ mod tests {
         assert!(notify_callback.after_update_done);
     }
 
+    /*
+    #[test]
+    fn test_add_shared_update_fail_after() {
+        let mut notify_callback = TestNotifyCallback::default();  
+        let target_path = compile_test_shared_lib();
+        let mut dest_path = Path::new(&target_path).to_path_buf();
+
+        let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
+
+        dest_path.set_file_name("test_file_2");
+
+        fs::copy(&target_path, &dest_path).unwrap();
+
+        panic!("{:?}", dr.add_library("test_file_2", UsePlatformName::No).err());
+
+        for i in 0..10 {
+            dr.update_with_callback(TestNotifyCallback::update_call, &mut notify_callback); 
+
+            if i == 2 {
+                // Copy a non-shared lib to test the lib handles a broken "lib"
+                fs::copy("Cargo.toml", &target_path).unwrap();
+            }
+
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        assert_eq!(notify_callback.update_call_done, true);
+        assert_eq!(notify_callback.after_update_done, false);
+    }
+    */
 }
