@@ -115,10 +115,7 @@ impl DynamicReload {
     ///
     /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
-    pub fn update_with_callback<F, T>(&mut self,
-                                      ref update_call: F,
-                                      data: &mut T)
-        where F: Fn(&mut T, bool, &Rc<Lib>)
+    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, bool, &Rc<Lib>)
     {
         match self.watch_recv.try_recv() {
             Ok(file) => {
@@ -130,12 +127,6 @@ impl DynamicReload {
             _ => (),
         }
     }
-
-    ///
-    /// Updates the DynamicReload handler and reloads the dynamic libraries if needed
-    ///
-    ///
-    pub fn update(&self) {}
 
     fn reload_libs<F, T>(&mut self,
                          file_path: &PathBuf,
@@ -546,7 +537,7 @@ mod tests {
         assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
 
         for i in 0..10 {
-            dr.update_with_callback(TestNotifyCallback::update_call, &mut notify_callback); 
+            dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
 
             if i == 2 {
                 fs::copy(&dest_path, &target_path).unwrap();
@@ -578,7 +569,7 @@ mod tests {
         assert!(dr.add_library(test_file, UsePlatformName::No).is_ok());
 
         for i in 0..10 {
-            dr.update_with_callback(TestNotifyCallback::update_call, &mut notify_callback); 
+            dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
 
             if i == 2 {
                 // Copy a non-shared lib to test the lib handles a broken "lib"
