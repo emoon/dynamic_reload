@@ -554,19 +554,21 @@ mod tests {
     fn test_add_shared_update_fail_after() {
         let mut notify_callback = TestNotifyCallback::default();  
         let target_path = compile_test_shared_lib();
-        let test_file = "test_file_2";
+        let test_file = DynamicReload::get_dynamiclib_name("test_file_2");
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
         let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
 
-        dest_path.set_file_name(test_file);
+        assert!(dr.shadow_dir.is_some());
+
+        dest_path.set_file_name(&test_file);
 
         DynamicReload::try_copy(&target_path, &dest_path);
 
         // Wait a while before open the file. Not sure why this is needed.
         thread::sleep(Duration::from_millis(100));
 
-        assert!(dr.add_library(test_file, UsePlatformName::No).is_ok());
+        assert!(dr.add_library(&test_file, UsePlatformName::No).is_ok());
 
         for i in 0..10 {
             dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
