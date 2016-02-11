@@ -408,7 +408,28 @@ mod tests {
     use std::sync::mpsc::channel;
     use std::path::Path;
     use std::env;
-    use std::fs;
+
+    fn compile_test_shared_lib() {
+        let exe_path = env::current_exe().unwrap();
+        let lib_path = exe_path.parent().unwrap();
+        let lib_name = "test_shared";
+        let lib_full_path = Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name));
+
+        // Only run if file doesn't exsits
+
+        if DynamicReload::is_file(&lib_full_path).is_none() {
+            Command::new("rustc")
+                .arg("src/test_shared.rs")
+                .arg("--crate-name")
+                .arg(&lib_name)
+                .arg("--crate-type")
+                .arg("dylib")
+                .arg("--out-dir")
+                .arg(&lib_path)
+                .output()
+                .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
+        }
+    }
 
     #[test]
     fn test_search_paths_none() {
@@ -486,27 +507,15 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_ok() {
-        let exe_path = env::current_exe().unwrap();
-        let lib_path = exe_path.parent().unwrap();
-        let lib_name = "test_shared";
-        let lib_full_path = Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name));
-
-        // Only run if file doesn't exsits
-
-        if DynamicReload::is_file(&lib_full_path).is_none() {
-            Command::new("rustc")
-                .arg("src/test_shared.rs")
-                .arg("--crate-name")
-                .arg(&lib_name)
-                .arg("--crate-type")
-                .arg("dylib")
-                .arg("--out-dir")
-                .arg(&lib_path)
-                .output()
-                .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
-        }
-
+        compile_test_shared_lib();
         let mut dr = DynamicReload::new(None, None, Search::Default);
+        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+    }
+
+    #[test]
+    fn test_add_shared_lib_search_paths() {
+        compile_test_shared_lib();
+        let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
         assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
     }
 }
