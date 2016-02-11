@@ -12,12 +12,12 @@ addons:
 # run builds for all the trains (and more)
 rust:
   # - nightly
-  - beta
+  # - beta
   # check it compiles on the latest stable compiler
   - stable
   # and the first stable one (this should be bumped as the minimum
   # Rust version required changes)
-  - 1.5.0
+  # - 1.6.0
 
 # load travis-cargo
 before_script:
