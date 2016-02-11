@@ -518,4 +518,11 @@ mod tests {
         let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
         assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
     }
+
+    #[test]
+    fn test_add_shared_shadow_dir_ok() {
+        compile_test_shared_lib();
+        let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
+        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+    }
 }
