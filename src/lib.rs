@@ -400,7 +400,6 @@ impl DynamicReload {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
     use std::sync::mpsc::channel;
     use std::path::{Path, PathBuf};
     use std::env;
@@ -429,25 +428,7 @@ mod tests {
         let exe_path = env::current_exe().unwrap();
         let lib_path = exe_path.parent().unwrap();
         let lib_name = "test_shared";
-        let lib_full_path = Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name));
-
-        if !DynamicReload::is_file(&lib_full_path).is_some() {
-            Command::new("rustc")
-                .arg("src/test_shared.rs")
-                .arg("--crate-name")
-                .arg(&lib_name)
-                .arg("--crate-type")
-                .arg("dylib")
-                .arg("--out-dir")
-                .arg(&lib_path)
-                .output()
-                .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
-        }
-
-        // Make sure file exists
-        assert!(DynamicReload::is_file(&lib_full_path).is_some());
-
-        lib_full_path
+        Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name))
     }
 
     #[test]
