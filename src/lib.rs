@@ -408,9 +408,6 @@ mod tests {
     use std::time::Duration;
     use std::rc::Rc;
     use std::fs;
-    use std::sync::{Once, ONCE_INIT};
-
-    static START: Once = ONCE_INIT;
 
     #[derive(Default)]
     struct TestNotifyCallback {
@@ -434,7 +431,7 @@ mod tests {
         let lib_name = "test_shared";
         let lib_full_path = Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name));
 
-        START.call_once(|| {
+        if !DynamicReload::is_file(&lib_full_path).is_some() {
             Command::new("rustc")
                 .arg("src/test_shared.rs")
                 .arg("--crate-name")
@@ -445,7 +442,7 @@ mod tests {
                 .arg(&lib_path)
                 .output()
                 .unwrap_or_else(|e| panic!("failed to execute process: {}", e));
-        });
+        }
 
         // Make sure file exists
         assert!(DynamicReload::is_file(&lib_full_path).is_some());
