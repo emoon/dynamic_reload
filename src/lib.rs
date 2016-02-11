@@ -334,7 +334,7 @@ impl DynamicReload {
                     let len = file.len();
                     if len > 0 {
                         fs::copy(&src, &dest).unwrap();
-                        // println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
+                        //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
                         return true;
                     }
                 }
@@ -578,27 +578,30 @@ mod tests {
         assert!(notify_callback.after_update_done);
     }
 
-    /*
     #[test]
     fn test_add_shared_update_fail_after() {
         let mut notify_callback = TestNotifyCallback::default();  
         let target_path = compile_test_shared_lib();
+        let test_file = "test_file_2";
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
         let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
 
-        dest_path.set_file_name("test_file_2");
+        dest_path.set_file_name(test_file);
 
-        fs::copy(&target_path, &dest_path).unwrap();
+        DynamicReload::try_copy(&target_path, &dest_path);
 
-        panic!("{:?}", dr.add_library("test_file_2", UsePlatformName::No).err());
+        // Wait a while before open the file. Not sure why this is needed.
+        thread::sleep(Duration::from_millis(100));
+
+        assert!(dr.add_library(test_file, UsePlatformName::No).is_ok());
 
         for i in 0..10 {
             dr.update_with_callback(TestNotifyCallback::update_call, &mut notify_callback); 
 
             if i == 2 {
                 // Copy a non-shared lib to test the lib handles a broken "lib"
-                fs::copy("Cargo.toml", &target_path).unwrap();
+                fs::copy("Cargo.toml", &dest_path).unwrap();
             }
 
             thread::sleep(Duration::from_millis(50));
@@ -607,5 +610,4 @@ mod tests {
         assert_eq!(notify_callback.update_call_done, true);
         assert_eq!(notify_callback.after_update_done, false);
     }
-    */
 }
