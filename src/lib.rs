@@ -69,6 +69,7 @@ pub enum Search {
 ///
 /// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with 
 ///
+#[derive(PartialEq)]
 pub enum UpdateState {
     /// Set when a shared library is about to be reloaded. Gives application time to save state, do
     /// clean up, etc
@@ -161,7 +162,7 @@ impl DynamicReload {
     /// then the supplied callback functions will be called
     ///
     ///
-    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, bool, &Rc<Lib>)
+    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
     {
         match self.watch_recv.try_recv() {
             Ok(file) => {
@@ -178,7 +179,7 @@ impl DynamicReload {
                          file_path: &PathBuf,
                          ref update_call: F,
                          data: &mut T)
-        where F: Fn(&mut T, bool, &Rc<Lib>)
+        where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
     {
         let len = self.libs.len();
         for i in (0..len).rev() {
@@ -193,19 +194,19 @@ impl DynamicReload {
                         file_path: &PathBuf,
                         ref update_call: F,
                         data: &mut T)
-        where F: Fn(&mut T, bool, &Rc<Lib>)
+        where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
     {
-        update_call(data, true, &self.libs[index]);
+        update_call(data, UpdateState::Before, Some(&self.libs[index]));
         self.libs.swap_remove(index);
 
         match Self::load_library(self, file_path) {
             Ok(lib) => {
                 self.libs.push(lib.clone());
-                update_call(data, false, &lib);
+                update_call(data, UpdateState::After, Some(&lib));
             }
 
-            // What should we really do here?
             Err(err) => {
+                update_call(data, UpdateState::ReloadFalied, None); 
                 println!("Unable to reload lib {:?} err {:?}", file_path, err);
             }
         }
@@ -449,14 +450,15 @@ mod tests {
     struct TestNotifyCallback {
         update_call_done: bool,
         after_update_done: bool,
+        fail_update_done: bool,
     }
 
     impl TestNotifyCallback {
-        fn update_call(&mut self, before: bool, _lib: &Rc<Lib>) {
-            if before {
-                self.update_call_done = true;
-            } else {
-                self.after_update_done = true;
+        fn update_call(&mut self, state: UpdateState, _lib: Option<&Rc<Lib>>) {
+            match state {
+                UpdateState::Before => self.update_call_done = true,
+                UpdateState::After => self.after_update_done  = true,
+                UpdateState::ReloadFalied => self.fail_update_done  = true,
             }
         }
     }
@@ -629,5 +631,6 @@ mod tests {
 
         assert_eq!(notify_callback.update_call_done, true);
         assert_eq!(notify_callback.after_update_done, false);
+        assert_eq!(notify_callback.fail_update_done, true);
     }
 }
