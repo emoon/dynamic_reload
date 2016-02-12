@@ -1,8 +1,26 @@
+//! dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc) 
+//! The intended use is to allow applications to reload code on the fly without closing down the application when some code changes. 
+//! This can be seen as a lite version of "live" coding for Rust. 
+//! It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any language that can target shared libraries. 
+//! A typical scenario can look like this:
+//!
+//! ```ignore
+//! 1. Application Foo starts.
+//! 2. Foo loads the shared library Bar.
+//! 3. The programmer needs to make some code changes to Bar. 
+//!    Instead of closing down Foo the programmer does the change, recompiles the code.
+//! 4. Foo will detect that Bar has been changed on the disk, 
+//!    will unload the old version and load the new one.
+//! ```
+//! dynamic_reload library will not try to solve any stale data hanging around in Foo from Bar. 
+//! It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. 
+//! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. 
+//! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
+//!
 extern crate libc;
 extern crate notify;
 extern crate libloading;
 extern crate tempdir;
-
 
 use libloading::Library;
 use std::path::{Path, PathBuf};
@@ -16,10 +34,16 @@ use std::fs;
 use std::env;
 use std::fmt::Write;
 
-
+///
+/// Contains the information for a loaded library.
+///
 pub struct Lib {
+    /// The actual loaded library. Refer to the libloading documentation on how to use this.
     pub lib: Library,
+    /// This is the path from where the library was loaded (which may be in a temporary directory)
     pub loaded_path: PathBuf,
+    /// Original location of the file. This is keep so dynamic_reload knows which file to look for
+    /// updates in case the library has been changed.
     pub original_path: Option<PathBuf>,
 }
 
@@ -31,14 +55,45 @@ pub struct DynamicReload {
     watch_recv: Receiver<Event>,
 }
 
+/// 
+/// Searching for a shared library can be done in current directory but can also be allowed to
+/// search backwards. 
+///
 pub enum Search {
+    /// Search in current directory only
     Default,
+    /// Allow searching in current directory and backwards of parent directories as well 
     Backwards,
 }
 
+///
+/// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with 
+///
+pub enum UpdateState {
+    /// Set when a shared library is about to be reloaded. Gives application time to save state, do
+    /// clean up, etc
+    Before,
+    /// Called when a library has been reloaded. Allows application to restore state.
+    After,
+    /// In case reloading of the library failed (broken file, etc) this will be set and allow the
+    /// application to to deal with the issue. 
+    ReloadFalied,
+}
+
+///
+/// This is used to decide how the name used for [add_library](struct.DynamicReload.html#method.add_library) is to be handled.
+///
 #[derive(PartialEq)]
-pub enum UsePlatformName {
+pub enum PlatformName {
+    /// Leave name as is and don't do any formating.
     No,
+    /// Format the name according to standard shared library name on the platform.
+    ///
+    /// ```ignore
+    /// Windows: foobar -> foobar.dll
+    /// Linux:   foobar -> libfoobar.so
+    /// Mac:     foobar -> libfoobar.dylib
+    /// ```
     Yes,
 }
 
@@ -63,29 +118,28 @@ impl DynamicReload {
 
     ///
     /// Add a library to be loaded and to be reloaded once updated. 
-    /// If UsePlatformName is set to Yes the input name will be formatted according
+    /// If PlatformName is set to Yes the input name will be formatted according
     /// to the standard way libraries looks on that platform examples:
     ///
     /// ```ignore
     /// Windows: foobar -> foobar.dll
     /// Linux:   foobar -> libfoobar.so
     /// Mac:     foobar -> libfoobar.dylib
-    /// ````
+    /// ```
     ///
-    /// If set to no the given inputname will be used as is. This function
+    /// If set to no the given input name will be used as is. This function
     /// will also search for the file in this priority order
-    ///
     ///
     /// ```ignore
     /// 1. Current directory
-    /// 2. In the search paths (relative to currect directory) 
-    /// 3. Currect directory of the executable 
-    /// 4. Serach backwards from executable if Backwards has been set in [new](struct.DynamicReload.html#method.new) 
+    /// 2. In the search paths (relative to current directory) 
+    /// 3. Current directory of the executable 
+    /// 4. Search backwards from executable if Backwards has been set in [new](struct.DynamicReload.html#method.new) 
     /// ```
     ///
     pub fn add_library(&mut self,
                        name: &str,
-                       name_format: UsePlatformName)
+                       name_format: PlatformName)
                        -> Result<Rc<Lib>, String> {
         match Self::try_load_library(self, name, name_format) {
             Ok(lib) => {
@@ -106,14 +160,6 @@ impl DynamicReload {
     /// Update the will check if a dynamic library needs to be reloaded and if that is the case
     /// then the supplied callback functions will be called
     ///
-    /// First the before_reload code. This allows the calling application to performe actions
-    /// before the dynamic library is unloaded. This can for example be to save some internal
-    /// state that needs to be restorted when relodaded
-    ///
-    /// After the reloading is comple the post_reload function will be called giving the host
-    /// application the possibility to restore any potentially saved state
-    ///
-    /// If no callbacks are needed use the regular [update](struct.DynamicReload.html#method.update) call instead
     ///
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, bool, &Rc<Lib>)
     {
@@ -168,7 +214,7 @@ impl DynamicReload {
 
     fn try_load_library(&self,
                         name: &str,
-                        name_format: UsePlatformName)
+                        name_format: PlatformName)
                         -> Result<Rc<Lib>, String> {
         if let Some(path) = Self::search_dirs(self, name, name_format) {
             Self::load_library(self, &path)
@@ -227,7 +273,7 @@ impl DynamicReload {
         false
     }
 
-    fn search_dirs(&self, name: &str, name_format: UsePlatformName) -> Option<PathBuf> {
+    fn search_dirs(&self, name: &str, name_format: PlatformName) -> Option<PathBuf> {
         let lib_name = Self::get_library_name(name, name_format);
 
         // 1. Serach the current directory
@@ -350,15 +396,15 @@ impl DynamicReload {
         }
     }
 
-    pub fn get_search_paths(search_paths: Option<Vec<&'static str>>) -> Vec<&'static str> {
+    fn get_search_paths(search_paths: Option<Vec<&'static str>>) -> Vec<&'static str> {
         match search_paths {
             Some(paths) => paths.clone(),
             None => Vec::new(),
         }
     }
 
-    fn get_library_name(name: &str, name_format: UsePlatformName) -> String {
-        if name_format == UsePlatformName::Yes {
+    fn get_library_name(name: &str, name_format: PlatformName) -> String {
+        if name_format == PlatformName::Yes {
             Self::get_dynamiclib_name(name)
         } else {
             name.to_string()
@@ -469,13 +515,13 @@ mod tests {
     #[test]
     #[cfg(target_os="macos")]
     fn test_get_library_name_mac() {
-        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::Yes),
+        assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::Yes),
                    "libfoobar.dylib");
     }
 
     #[test]
     fn test_get_library_name() {
-        assert_eq!(DynamicReload::get_library_name("foobar", UsePlatformName::No),
+        assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::No),
                    "foobar");
     }
 
@@ -493,27 +539,27 @@ mod tests {
     #[test]
     fn test_add_library_fail() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("wont_find_this_lib", UsePlatformName::No).is_err());
+        assert!(dr.add_library("wont_find_this_lib", PlatformName::No).is_err());
     }
 
     #[test]
     fn test_add_shared_lib_ok() {
         compile_test_shared_lib();
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
 
     #[test]
     fn test_add_shared_lib_search_paths() {
         compile_test_shared_lib();
         let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
-        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
 
     #[test]
     fn test_add_shared_lib_fail_load() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("Cargo.toml", UsePlatformName::No).is_err());
+        assert!(dr.add_library("Cargo.toml", PlatformName::No).is_err());
     }
 
     #[test]
@@ -534,7 +580,7 @@ mod tests {
 
         fs::copy(&target_path, &dest_path).unwrap();
 
-        assert!(dr.add_library("test_shared", UsePlatformName::Yes).is_ok());
+        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
 
         for i in 0..10 {
             dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
@@ -568,7 +614,7 @@ mod tests {
         // Wait a while before open the file. Not sure why this is needed.
         thread::sleep(Duration::from_millis(100));
 
-        assert!(dr.add_library(&test_file, UsePlatformName::No).is_ok());
+        assert!(dr.add_library(&test_file, PlatformName::No).is_ok());
 
         for i in 0..10 {
             dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
