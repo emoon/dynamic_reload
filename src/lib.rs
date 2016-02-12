@@ -461,7 +461,7 @@ mod tests {
         }
     }
 
-    fn compile_test_shared_lib() -> PathBuf {
+    fn get_test_shared_lib() -> PathBuf {
         let exe_path = env::current_exe().unwrap();
         let lib_path = exe_path.parent().unwrap();
         let lib_name = "test_shared";
@@ -544,14 +544,14 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_ok() {
-        compile_test_shared_lib();
+        get_test_shared_lib();
         let mut dr = DynamicReload::new(None, None, Search::Default);
         assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
 
     #[test]
     fn test_add_shared_lib_search_paths() {
-        compile_test_shared_lib();
+        get_test_shared_lib();
         let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
         assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
@@ -571,7 +571,7 @@ mod tests {
     #[test]
     fn test_add_shared_update() {
         let mut notify_callback = TestNotifyCallback::default();  
-        let target_path = compile_test_shared_lib();
+        let target_path = get_test_shared_lib();
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
         let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn test_add_shared_update_fail_after() {
         let mut notify_callback = TestNotifyCallback::default();  
-        let target_path = compile_test_shared_lib();
+        let target_path = get_test_shared_lib();
         let test_file = DynamicReload::get_dynamiclib_name("test_file_2");
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
