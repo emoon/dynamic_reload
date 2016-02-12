@@ -5,11 +5,13 @@ dynamic_reload is a cross platform library written in [Rust](https://www.rust-la
 ```
 1. Application Foo starts.
 2. Foo loads the shared library Bar.
-3. The programmer needs to make some code changes to Bar. Instead of closing down Foo the programmer does the change, recompiles the code.
-4. Foo will detect that Bar has been changed on the disk, will unload the old version and load the new one.
+3. The programmer needs to make some code changes to Bar. 
+   Instead of closing down Foo the programmer does the change, recompiles the code.
+4. Foo will detect that Bar has been changed on the disk, 
+   will unload the old version and load the new one.
 ```
 
-It's worth to mention that the dynamic_reload library will not try to solve any stale data haninging around in Foo from Bar. It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
+dynamic_reload library will not try to solve any stale data haninging around in Foo from Bar. It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 
 
 Usage
