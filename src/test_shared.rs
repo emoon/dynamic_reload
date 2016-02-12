@@ -1,4 +1,5 @@
 
 #[no_mangle]
-pub fn extern_fun() {
+pub fn shared_fun() -> i32 {
+    42
 }
