@@ -26,6 +26,15 @@ Usage
 Example
 -------
 
+To actually test reloading of this example do the following
+
+```
+1, cargo run --example example
+2. In another shell change src/test_shared.rs to return another value
+3. Run cargo build
+4. Notice that the value return in 1. is now changed
+```
+
 ```rust
 extern crate dynamic_reload;
 
