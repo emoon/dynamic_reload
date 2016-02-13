@@ -34,6 +34,8 @@ use std::fs;
 use std::env;
 use std::fmt::Write;
 
+pub use libloading::Symbol;
+
 ///
 /// Contains the information for a loaded library.
 ///
