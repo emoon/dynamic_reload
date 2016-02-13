@@ -75,7 +75,7 @@ impl Plugins {
 }
 
 fn main() {
-    let mut plugin_handler = Plugins { plugins: Vec::new() };
+    let mut plugs = Plugins { plugins: Vec::new() };
 
     // Setup the reload handler. A temporary directory will be created inside the target/debug
     // where plugins will be loaded from. That is because on some OS:es loading a shared lib
@@ -86,7 +86,7 @@ fn main() {
 
     // test_shared is generated in build.rs
     match reload_handler.add_library("test_shared", PlatformName::Yes) {
-        Ok(lib) => plugin_handler.add_plugin(&lib),
+        Ok(lib) => plugs.add_plugin(&lib),
         Err(e) => {
             println!("Unable to load dynamic lib, err {:?}", e);
             return;
@@ -98,13 +98,13 @@ fn main() {
     // build the project with cargo build and notice that this code will now return the new value
     //
     loop {
-        reload_handler.update(Plugins::reload_callback, &mut plugin_handler);
+        reload_handler.update(Plugins::reload_callback, &mut plugs);
 
-        if plugin_handler.plugins.len() > 0 {
+        if plugs.plugins.len() > 0 {
             // In a real program you want to cache the symbol and not do it every time if your
             // application is performance critical
             let fun: Symbol<extern "C" fn() -> i32> = unsafe {
-                plugin_handler.plugins[0].lib.get(b"shared_fun\0").unwrap()
+                plugs.plugins[0].lib.get(b"shared_fun\0").unwrap()
             };
 
             println!("Value {}", fun());
