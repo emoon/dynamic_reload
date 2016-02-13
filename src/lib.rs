@@ -104,6 +104,33 @@ pub enum PlatformName {
 
 impl DynamicReload {
     ///
+    /// Creates a DynamicReload object. 
+    ///
+    /// ```search_path``` is a list of extra paths that when
+    /// calling [add_library](struct.DynamicReload.html#method.add_library) the code will
+    /// also try to find the shared library within those locations.
+    ///
+    /// ```shadow_dir``` is a location where a temporary directory will be created to
+    /// keep a copy of all the shared libraries and load from there. The reason is that some
+    /// operating systems locks loaded shared files which would make it impossible to update them.
+    /// By having a separate directory DynamicReload will look for changes in the original path
+    /// while having them loaded from another
+    ///
+    /// ```search``` This is to allow DynamicReload to search in parent directiors from the
+    /// executable. Set this to ```Search::Backwards``` to allow that or to ```Search::Default```
+    /// to only allow seach in the currenty directory of the of the executable
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // No extra search paths, temp directory in target/debug, allow search backwards
+    /// DynamicReload::new(None, Some("target/debug"), Search::Backwards);
+    /// ```
+    ///
+    /// ```
+    /// // "../.." extra search path, temp directory in target/debug, allow search backwards
+    /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
+    /// ```
     ///
     pub fn new(search_paths: Option<Vec<&'static str>>,
                shadow_dir: Option<&'static str>,
@@ -137,7 +164,13 @@ impl DynamicReload {
     /// 1. Current directory
     /// 2. In the search paths (relative to current directory) 
     /// 3. Current directory of the executable 
-    /// 4. Search backwards from executable if Backwards has been set in [new](struct.DynamicReload.html#method.new) 
+    /// 4. Search backwards from executable if Backwards has been set DynamicReload::new 
+    /// ```
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Add a library named test_lib and format it according to standard platform standard.
+    /// add_library("test_lib", PlatformName::Yes)
     /// ```
     ///
     pub fn add_library(&mut self,
@@ -160,9 +193,33 @@ impl DynamicReload {
     }
 
     ///
-    /// Update the will check if a dynamic library needs to be reloaded and if that is the case
-    /// then the supplied callback functions will be called
+    /// Needs to be called in order to handle reloads of libraries. 
+    /// 
+    /// ```update_call``` funcion with it's data needs to be supplied to allow the application to
+    /// take appropriate action depending on what needs to be done with the loaded library.
     ///
+    /// ```
+    /// struct Plugins {
+    ///     // ...
+    /// }
+    ///
+    /// impl Plugins {
+    ///    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Rc<Lib>>) {
+    ///        match state {
+    ///            UpdateState::Before => // save state, remove from lists, etc, here 
+    ///            UpdateState::After => // shared lib reloaded, re-add, restore state 
+    ///            UpdateState::ReloadFalied => // shared lib failed to reload 
+    ///        }
+    ///    }
+    /// }
+    ///
+    /// fn main() {
+    ///     let plugins = Plugins { ... };
+    ///     let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Backwards);
+    ///     dr.add_library("test_shared", Search::Backwards);
+    ///     dr.update(Plugin::reload_callback, &mut plugins);
+    /// }
+    /// ```
     ///
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
     {
