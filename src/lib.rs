@@ -122,12 +122,12 @@ impl DynamicReload {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```ignore
     /// // No extra search paths, temp directory in target/debug, allow search backwards
     /// DynamicReload::new(None, Some("target/debug"), Search::Backwards);
     /// ```
     ///
-    /// ```
+    /// ```ignore
     /// // "../.." extra search path, temp directory in target/debug, allow search backwards
     /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
     /// ```
@@ -198,7 +198,7 @@ impl DynamicReload {
     /// ```update_call``` funcion with it's data needs to be supplied to allow the application to
     /// take appropriate action depending on what needs to be done with the loaded library.
     ///
-    /// ```
+    /// ```ignore
     /// struct Plugins {
     ///     // ...
     /// }
