@@ -94,7 +94,7 @@ fn main() {
     }
 
 	//
-    // While this is running (printing a constant number) change return value in file src/test_shared.rs
+    // While this is running (printing a number) change return value in file src/test_shared.rs
     // build the project with cargo build and notice that this code will now return the new value
     //
     loop {
