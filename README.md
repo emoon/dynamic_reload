@@ -14,6 +14,7 @@ dynamic_reload is a cross platform library written in [Rust](https://www.rust-la
 
 dynamic_reload library will not try to solve any stale data haninging around in Foo from Bar. It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 
+[Documentation](http://prodbg.com/dynamic_reload/dynamic_reload/index.html)
 
 Usage
 -----
