@@ -494,6 +494,17 @@ impl DynamicReload {
     }
 }
 
+impl PartialEq for Lib {
+    fn eq(&self, other: &Lib) -> bool {
+        self.original_path == other.original_path
+    }
+
+    fn ne(&self, other: &Lib) -> bool {
+        self.original_path != other.original_path
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -605,14 +616,12 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_ok() {
-        get_test_shared_lib();
         let mut dr = DynamicReload::new(None, None, Search::Default);
         assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
 
     #[test]
     fn test_add_shared_lib_search_paths() {
-        get_test_shared_lib();
         let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
         assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
@@ -691,5 +700,32 @@ mod tests {
         assert_eq!(notify_callback.update_call_done, true);
         assert_eq!(notify_callback.after_update_done, false);
         assert_eq!(notify_callback.fail_update_done, true);
+    }
+
+    #[test]
+    fn test_lib_equals_true() {
+        let mut dr = DynamicReload::new(None, None, Search::Default);
+        let lib = dr.add_library("test_shared", PlatformName::Yes).unwrap();
+        let lib2 = lib.clone();
+        assert!(lib == lib2);
+    }
+
+    #[test]
+    fn test_lib_equals_false() {
+        let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
+        let target_path = get_test_shared_lib();
+
+        let test_file = DynamicReload::get_dynamiclib_name("test_file_2");
+        let mut dest_path = Path::new(&target_path).to_path_buf();
+
+        dest_path.set_file_name(&test_file);
+
+        DynamicReload::try_copy(&target_path, &dest_path);
+        thread::sleep(Duration::from_millis(100));
+
+        let lib0 = dr.add_library(&test_file, PlatformName::No).unwrap();
+        let lib1 = dr.add_library("test_shared", PlatformName::Yes).unwrap();
+
+        assert!(lib0 != lib1);
     }
 }
