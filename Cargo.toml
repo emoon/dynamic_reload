@@ -1,6 +1,6 @@
 [package]
 name = "dynamic_reload"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT/Apache-2.0"
 authors = ["Daniel Collin <daniel@collin.com>"]
 description = "Cross-platform dynamic reloading of shared libraries"

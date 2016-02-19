@@ -16,7 +16,7 @@ impl Plugins {
 
     fn unload_plugins(&mut self, lib: &Rc<Lib>) {
         for i in (0..self.plugins.len()).rev() {
-            if self.plugins[i].original_path == lib.original_path {
+            if &self.plugins[i] == lib {
                 self.plugins.swap_remove(i);
             }
         }
