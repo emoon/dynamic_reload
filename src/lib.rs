@@ -53,7 +53,7 @@ pub struct DynamicReload {
     libs: Vec<Rc<Lib>>,
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
-    search_paths: Vec<&'static str>,
+    search_paths: Vec<String>,
     watch_recv: Receiver<Event>,
 }
 
@@ -132,8 +132,8 @@ impl DynamicReload {
     /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
     /// ```
     ///
-    pub fn new(search_paths: Option<Vec<&'static str>>,
-               shadow_dir: Option<&'static str>,
+    pub fn new(search_paths: Option<Vec<String>>,
+               shadow_dir: Option<String>,
                _search: Search)
                -> DynamicReload {
         let (tx, rx) = channel();
@@ -390,7 +390,7 @@ impl DynamicReload {
         Self::search_backwards_from_file(&exe_path, lib_name)
     }
 
-    fn get_temp_dir(shadow_dir: Option<&str>) -> Option<TempDir> {
+    fn get_temp_dir(shadow_dir: Option<String>) -> Option<TempDir> {
         match shadow_dir {
             Some(dir) => {
                 match TempDir::new_in(dir, "shadow_libs") {
@@ -456,7 +456,7 @@ impl DynamicReload {
         }
     }
 
-    fn get_search_paths(search_paths: Option<Vec<&'static str>>) -> Vec<&'static str> {
+    fn get_search_paths(search_paths: Option<Vec<String>>) -> Vec<String> {
         match search_paths {
             Some(paths) => paths.clone(),
             None => Vec::new(),
