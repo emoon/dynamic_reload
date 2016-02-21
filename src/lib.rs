@@ -49,11 +49,11 @@ pub struct Lib {
     pub original_path: Option<PathBuf>,
 }
 
-pub struct DynamicReload {
+pub struct DynamicReload<'a> {
     libs: Vec<Rc<Lib>>,
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
-    search_paths: Vec<&'static str>,
+    search_paths: Vec<&'a str>,
     watch_recv: Receiver<Event>,
 }
 
@@ -102,7 +102,7 @@ pub enum PlatformName {
 
 // Test
 
-impl DynamicReload {
+impl<'a> DynamicReload<'a> {
     ///
     /// Creates a DynamicReload object. 
     ///
@@ -132,10 +132,10 @@ impl DynamicReload {
     /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
     /// ```
     ///
-    pub fn new(search_paths: Option<Vec<&'static str>>,
-               shadow_dir: Option<&'static str>,
+    pub fn new(search_paths: Option<Vec<&'a str>>,
+               shadow_dir: Option<&'a str>,
                _search: Search)
-               -> DynamicReload {
+               -> DynamicReload<'a> {
         let (tx, rx) = channel();
         DynamicReload {
             libs: Vec::new(),
@@ -456,7 +456,7 @@ impl DynamicReload {
         }
     }
 
-    fn get_search_paths(search_paths: Option<Vec<&'static str>>) -> Vec<&'static str> {
+    fn get_search_paths(search_paths: Option<Vec<&str>>) -> Vec<&str> {
         match search_paths {
             Some(paths) => paths.clone(),
             None => Vec::new(),
@@ -636,6 +636,21 @@ mod tests {
     fn test_add_shared_shadow_dir_ok() {
         let dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
         assert!(dr.shadow_dir.is_some());
+    }
+
+    #[test]
+    fn test_add_shared_string_arg_ok() {
+        let shadow_dir_string = "target/debug".to_owned();
+        let dr = DynamicReload::new(None, Some(&shadow_dir_string), Search::Default);
+        assert!(dr.shadow_dir.is_some());
+    }
+
+    #[test]
+    fn test_add_shared_lib_search_paths_strings() {
+        let path1 = "../..".to_owned();
+        let path2 = "../test".to_owned();
+        let mut dr = DynamicReload::new(Some(vec![&path1, &path2]), None, Search::Default);
+        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
     }
 
     #[test]
