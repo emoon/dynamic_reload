@@ -1,18 +1,18 @@
 # dynamic_reload [![Build Status](https://travis-ci.org/emoon/dynamic_reload.svg?branch=master)](https://travis-ci.org/emoon/dynamic_reload) [![Build status](https://ci.appveyor.com/api/projects/status/cblu63ub2sqntr9w?svg=true)](https://ci.appveyor.com/project/emoon/dynamic-reload) [![Coverage Status](https://coveralls.io/repos/github/emoon/dynamic_reload/badge.svg?branch=master)](https://coveralls.io/github/emoon/dynamic_reload?branch=master) [![Crates.io](https://img.shields.io/crates/v/dynamic_reload.svg)](https://crates.io/crates/dynamic_reload)
 
 
-dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc) The intended use is to allow applications to reload code on the fly without closing down the application when some code changes. This can be seen as a lite version of "live" coding for Rust. It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any langague that can target shared libraries. A typical scenario can look like this:
+dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc). The intended use is to allow applications to reload code on the fly without closing down the application when some code changes. This can be seen as a lite version of "live" coding for Rust. It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any language that can target shared libraries. A typical scenario can look like this:
 
 ```
 1. Application Foo starts.
 2. Foo loads the shared library Bar.
-3. The programmer needs to make some code changes to Bar. 
+3. The programmer needs to make some code changes to Bar.
    Instead of closing down Foo the programmer does the change, recompiles the code.
-4. Foo will detect that Bar has been changed on the disk, 
+4. Foo will detect that Bar has been changed on the disk,
    will unload the old version and load the new one.
 ```
 
-dynamic_reload library will not try to solve any stale data haninging around in Foo from Bar. It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
+dynamic_reload library will not try to solve any stale data hanging around in Foo from Bar. It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 
 [Documentation](http://prodbg.com/dynamic_reload/dynamic_reload/index.html)
 
@@ -96,7 +96,7 @@ fn main() {
         }
     }
 
-	//
+    //
     // While this is running (printing a number) change return value in file src/test_shared.rs
     // build the project with cargo build and notice that this code will now return the new value
     //
@@ -121,7 +121,7 @@ fn main() {
 
 ## Acknowledgment
 
-dynamic_reload uses these two creats for most of the heavy lifting. Thanks!
+dynamic_reload uses these two crates for most of the heavy lifting. Thanks!
 
 Notify: https://github.com/passcod/rsnotify
 
@@ -139,4 +139,3 @@ at your option.
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
-
