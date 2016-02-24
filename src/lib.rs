@@ -58,7 +58,7 @@ pub struct DynamicReload<'a> {
 }
 
 ///
-/// Searching for a shared library can be done in current directory but can also be allowed to
+/// Searching for a shared library can be done in current directory, but can also be allowed to
 /// search backwards.
 ///
 pub enum Search {
@@ -73,10 +73,10 @@ pub enum Search {
 ///
 #[derive(PartialEq)]
 pub enum UpdateState {
-    /// Set when a shared library is about to be reloaded. Gives application time to save state, do
-    /// clean up, etc
+    /// Set when a shared library is about to be reloaded. Gives the application time to save state,
+    /// do clean up, etc
     Before,
-    /// Called when a library has been reloaded. Allows application to restore state.
+    /// Called when a library has been reloaded. Allows the application to restore state.
     After,
     /// In case reloading of the library failed (broken file, etc) this will be set and allow the
     /// application to to deal with the issue.
@@ -99,8 +99,6 @@ pub enum PlatformName {
     /// ```
     Yes,
 }
-
-// Test
 
 impl<'a> DynamicReload<'a> {
     ///
@@ -195,7 +193,7 @@ impl<'a> DynamicReload<'a> {
     ///
     /// Needs to be called in order to handle reloads of libraries.
     ///
-    /// ```update_call``` funcion with it's data needs to be supplied to allow the application to
+    /// ```update_call``` funcion with its data needs to be supplied to allow the application to
     /// take appropriate action depending on what needs to be done with the loaded library.
     ///
     /// ```ignore
@@ -336,17 +334,17 @@ impl<'a> DynamicReload<'a> {
     fn search_dirs(&self, name: &str, name_format: PlatformName) -> Option<PathBuf> {
         let lib_name = Self::get_library_name(name, name_format);
 
-        // 1. Serach the current directory
+        // 1. Search the current directory
         if let Some(path) = Self::search_current_dir(&lib_name) {
             return Some(path);
         }
 
-        // 2. search the relative paths
+        // 2. Search the relative paths
         if let Some(path) = Self::search_relative_paths(self, &lib_name) {
             return Some(path);
         }
 
-        // 3. searches in the executable dir and then backwards
+        // 3. Search the executable dir and then go backwards
         Self::search_backwards_from_exe(&lib_name)
     }
 
@@ -418,10 +416,10 @@ impl<'a> DynamicReload<'a> {
         }
     }
 
-    // In some cases when a file has been set that it's reloaded it's actually not possible
+    // In some cases when a file has been set so that it's reloaded, it's actually not possible
     // to read from it directly so this code does some testing first to ensure we
-    // can actually read from it (by using metadata which does a stat on the file)
-    // If we can't read from it we wait for 100 ms before we try again, if we can't
+    // can actually read from it (by using metadata which does a stat on the file).
+    // If we can't read from it, we wait for 100 ms before we try again, if we can't
     // do it within 1 sec we give up
     //
     fn try_copy(src: &Path, dest: &Path) -> bool {
@@ -599,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_search_backwards_from_file_ok() {
-        // While this rely on that we have a Cargo project it should be fine
+        // While this relays on having a Cargo project, it should be fine
         assert!(DynamicReload::search_backwards_from_exe(&"Cargo.toml".to_string()).is_some());
     }
 
