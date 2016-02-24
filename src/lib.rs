@@ -1,20 +1,20 @@
-//! dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc) 
-//! The intended use is to allow applications to reload code on the fly without closing down the application when some code changes. 
-//! This can be seen as a lite version of "live" coding for Rust. 
-//! It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any language that can target shared libraries. 
+//! dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc)
+//! The intended use is to allow applications to reload code on the fly without closing down the application when some code changes.
+//! This can be seen as a lite version of "live" coding for Rust.
+//! It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any language that can target shared libraries.
 //! A typical scenario can look like this:
 //!
 //! ```ignore
 //! 1. Application Foo starts.
 //! 2. Foo loads the shared library Bar.
-//! 3. The programmer needs to make some code changes to Bar. 
+//! 3. The programmer needs to make some code changes to Bar.
 //!    Instead of closing down Foo the programmer does the change, recompiles the code.
-//! 4. Foo will detect that Bar has been changed on the disk, 
+//! 4. Foo will detect that Bar has been changed on the disk,
 //!    will unload the old version and load the new one.
 //! ```
-//! dynamic_reload library will not try to solve any stale data hanging around in Foo from Bar. 
-//! It is up to Foo to make sure all data has been cleaned up before Foo is reloaded. 
-//! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action. 
+//! dynamic_reload library will not try to solve any stale data hanging around in Foo from Bar.
+//! It is up to Foo to make sure all data has been cleaned up before Foo is reloaded.
+//! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action.
 //! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 //!
 extern crate libc;
@@ -57,29 +57,29 @@ pub struct DynamicReload<'a> {
     watch_recv: Receiver<Event>,
 }
 
-/// 
-/// Searching for a shared library can be done in current directory but can also be allowed to
-/// search backwards. 
+///
+/// Searching for a shared library can be done in current directory, but can also be allowed to
+/// search backwards.
 ///
 pub enum Search {
     /// Search in current directory only
     Default,
-    /// Allow searching in current directory and backwards of parent directories as well 
+    /// Allow searching in current directory and backwards of parent directories as well
     Backwards,
 }
 
 ///
-/// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with 
+/// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with
 ///
 #[derive(PartialEq)]
 pub enum UpdateState {
-    /// Set when a shared library is about to be reloaded. Gives application time to save state, do
-    /// clean up, etc
+    /// Set when a shared library is about to be reloaded. Gives the application time to save state,
+    /// do clean up, etc
     Before,
-    /// Called when a library has been reloaded. Allows application to restore state.
+    /// Called when a library has been reloaded. Allows the application to restore state.
     After,
     /// In case reloading of the library failed (broken file, etc) this will be set and allow the
-    /// application to to deal with the issue. 
+    /// application to to deal with the issue.
     ReloadFalied,
 }
 
@@ -100,11 +100,9 @@ pub enum PlatformName {
     Yes,
 }
 
-// Test
-
 impl<'a> DynamicReload<'a> {
     ///
-    /// Creates a DynamicReload object. 
+    /// Creates a DynamicReload object.
     ///
     /// ```search_path``` is a list of extra paths that when
     /// calling [add_library](struct.DynamicReload.html#method.add_library) the code will
@@ -147,7 +145,7 @@ impl<'a> DynamicReload<'a> {
     }
 
     ///
-    /// Add a library to be loaded and to be reloaded once updated. 
+    /// Add a library to be loaded and to be reloaded once updated.
     /// If PlatformName is set to Yes the input name will be formatted according
     /// to the standard way libraries looks on that platform examples:
     ///
@@ -162,9 +160,9 @@ impl<'a> DynamicReload<'a> {
     ///
     /// ```ignore
     /// 1. Current directory
-    /// 2. In the search paths (relative to current directory) 
-    /// 3. Current directory of the executable 
-    /// 4. Search backwards from executable if Backwards has been set DynamicReload::new 
+    /// 2. In the search paths (relative to current directory)
+    /// 3. Current directory of the executable
+    /// 4. Search backwards from executable if Backwards has been set DynamicReload::new
     /// ```
     /// # Examples
     ///
@@ -193,9 +191,9 @@ impl<'a> DynamicReload<'a> {
     }
 
     ///
-    /// Needs to be called in order to handle reloads of libraries. 
-    /// 
-    /// ```update_call``` funcion with it's data needs to be supplied to allow the application to
+    /// Needs to be called in order to handle reloads of libraries.
+    ///
+    /// ```update_call``` funcion with its data needs to be supplied to allow the application to
     /// take appropriate action depending on what needs to be done with the loaded library.
     ///
     /// ```ignore
@@ -206,9 +204,9 @@ impl<'a> DynamicReload<'a> {
     /// impl Plugins {
     ///    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Rc<Lib>>) {
     ///        match state {
-    ///            UpdateState::Before => // save state, remove from lists, etc, here 
-    ///            UpdateState::After => // shared lib reloaded, re-add, restore state 
-    ///            UpdateState::ReloadFalied => // shared lib failed to reload 
+    ///            UpdateState::Before => // save state, remove from lists, etc, here
+    ///            UpdateState::After => // shared lib reloaded, re-add, restore state
+    ///            UpdateState::ReloadFalied => // shared lib failed to reload
     ///        }
     ///    }
     /// }
@@ -265,7 +263,7 @@ impl<'a> DynamicReload<'a> {
             }
 
             Err(err) => {
-                update_call(data, UpdateState::ReloadFalied, None); 
+                update_call(data, UpdateState::ReloadFalied, None);
                 println!("Unable to reload lib {:?} err {:?}", file_path, err);
             }
         }
@@ -336,17 +334,17 @@ impl<'a> DynamicReload<'a> {
     fn search_dirs(&self, name: &str, name_format: PlatformName) -> Option<PathBuf> {
         let lib_name = Self::get_library_name(name, name_format);
 
-        // 1. Serach the current directory
+        // 1. Search the current directory
         if let Some(path) = Self::search_current_dir(&lib_name) {
             return Some(path);
         }
 
-        // 2. search the relative paths
+        // 2. Search the relative paths
         if let Some(path) = Self::search_relative_paths(self, &lib_name) {
             return Some(path);
         }
 
-        // 3. searches in the executable dir and then backwards
+        // 3. Search the executable dir and then go backwards
         Self::search_backwards_from_exe(&lib_name)
     }
 
@@ -418,11 +416,11 @@ impl<'a> DynamicReload<'a> {
         }
     }
 
-    // In some cases when a file has been set that it's reloaded it's actually not possible
+    // In some cases when a file has been set so that it's reloaded, it's actually not possible
     // to read from it directly so this code does some testing first to ensure we
-    // can actually read from it (by using metadata which does a stat on the file)
-    // If we can't read from it we wait for 100 ms before we try again, if we can't
-    // do it with in 1 sec we give up
+    // can actually read from it (by using metadata which does a stat on the file).
+    // If we can't read from it, we wait for 100 ms before we try again, if we can't
+    // do it within 1 sec we give up
     //
     fn try_copy(src: &Path, dest: &Path) -> bool {
         for _ in 0..10 {
@@ -599,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_search_backwards_from_file_ok() {
-        // While this rely on that we have a Cargo project it should be fine
+        // While this relays on having a Cargo project, it should be fine
         assert!(DynamicReload::search_backwards_from_exe(&"Cargo.toml".to_string()).is_some());
     }
 
@@ -655,7 +653,7 @@ mod tests {
 
     #[test]
     fn test_add_shared_update() {
-        let mut notify_callback = TestNotifyCallback::default();  
+        let mut notify_callback = TestNotifyCallback::default();
         let target_path = get_test_shared_lib();
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
@@ -668,7 +666,7 @@ mod tests {
         assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
 
         for i in 0..10 {
-            dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
+            dr.update(TestNotifyCallback::update_call, &mut notify_callback);
 
             if i == 2 {
                 fs::copy(&dest_path, &target_path).unwrap();
@@ -683,7 +681,7 @@ mod tests {
 
     #[test]
     fn test_add_shared_update_fail_after() {
-        let mut notify_callback = TestNotifyCallback::default();  
+        let mut notify_callback = TestNotifyCallback::default();
         let target_path = get_test_shared_lib();
         let test_file = DynamicReload::get_dynamiclib_name("test_file_2");
         let mut dest_path = Path::new(&target_path).to_path_buf();
@@ -702,7 +700,7 @@ mod tests {
         assert!(dr.add_library(&test_file, PlatformName::No).is_ok());
 
         for i in 0..10 {
-            dr.update(TestNotifyCallback::update_call, &mut notify_callback); 
+            dr.update(TestNotifyCallback::update_call, &mut notify_callback);
 
             if i == 2 {
                 // Copy a non-shared lib to test the lib handles a broken "lib"
