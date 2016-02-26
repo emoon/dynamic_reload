@@ -32,9 +32,13 @@ use std::time::Duration;
 use std::thread;
 use std::fs;
 use std::env;
-use std::fmt::Write;
 
 pub use libloading::Symbol;
+
+mod error;
+pub use self::error::Error;
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 ///
 /// Contains the information for a loaded library.
@@ -71,7 +75,6 @@ pub enum Search {
 ///
 /// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with
 ///
-#[derive(PartialEq)]
 pub enum UpdateState {
     /// Set when a shared library is about to be reloaded. Gives the application time to save state,
     /// do clean up, etc
@@ -80,7 +83,7 @@ pub enum UpdateState {
     After,
     /// In case reloading of the library failed (broken file, etc) this will be set and allow the
     /// application to to deal with the issue.
-    ReloadFalied,
+    ReloadFalied(Error),
 }
 
 ///
@@ -174,7 +177,7 @@ impl<'a> DynamicReload<'a> {
     pub fn add_library(&mut self,
                        name: &str,
                        name_format: PlatformName)
-                       -> Result<Rc<Lib>, String> {
+                       -> Result<Rc<Lib>> {
         match Self::try_load_library(self, name, name_format) {
             Ok(lib) => {
                 if let Some(w) = self.watcher.as_mut() {
@@ -206,7 +209,7 @@ impl<'a> DynamicReload<'a> {
     ///        match state {
     ///            UpdateState::Before => // save state, remove from lists, etc, here
     ///            UpdateState::After => // shared lib reloaded, re-add, restore state
-    ///            UpdateState::ReloadFalied => // shared lib failed to reload
+    ///            UpdateState::ReloadFalied(Error) => // shared lib failed to reload due to error
     ///        }
     ///    }
     /// }
@@ -263,8 +266,8 @@ impl<'a> DynamicReload<'a> {
             }
 
             Err(err) => {
-                update_call(data, UpdateState::ReloadFalied, None);
-                println!("Unable to reload lib {:?} err {:?}", file_path, err);
+                update_call(data, UpdateState::ReloadFalied(err), None);
+                //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
             }
         }
     }
@@ -273,28 +276,21 @@ impl<'a> DynamicReload<'a> {
     fn try_load_library(&self,
                         name: &str,
                         name_format: PlatformName)
-                        -> Result<Rc<Lib>, String> {
-        if let Some(path) = Self::search_dirs(self, name, name_format) {
-            Self::load_library(self, &path)
-        } else {
-            let mut t = "Unable to find ".to_string();
-            t.push_str(name);
-            Err(t)
+                        -> Result<Rc<Lib>> {
+        match Self::search_dirs(self, name, name_format) {
+          Some(path) => Self::load_library(self, &path),
+          None => Err(Error::Find(name.into())),
         }
     }
 
 
-    fn load_library(&self, full_path: &PathBuf) -> Result<Rc<Lib>, String> {
+    fn load_library(&self, full_path: &PathBuf) -> Result<Rc<Lib>> {
         let path;
         let original_path;
 
         if let Some(sd) = self.shadow_dir.as_ref() {
             path = sd.path().join(full_path.file_name().unwrap());
-            if !Self::try_copy(&full_path, &path) {
-                let mut error = "".to_string();
-                write!(error, "Unable to copy {:?} to {:?}", full_path, path).unwrap();
-                return Err(error);
-            }
+            try!(Self::try_copy(&full_path, &path));
             original_path = Some(full_path.clone());
         } else {
             original_path = None;
@@ -304,7 +300,7 @@ impl<'a> DynamicReload<'a> {
         Self::init_library(original_path, path)
     }
 
-    fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Rc<Lib>, String> {
+    fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Rc<Lib>> {
         match Library::new(&path) {
             Ok(l) => {
                 Ok(Rc::new(Lib {
@@ -313,11 +309,7 @@ impl<'a> DynamicReload<'a> {
                     lib: l,
                 }))
             }
-            Err(e) => {
-                let mut error = "".to_string();
-                write!(error, "Unable to load library {:?}", e).unwrap();
-                Err(error)
-            }
+            Err(e) => Err(Error::Load(e))
         }
     }
 
@@ -422,24 +414,23 @@ impl<'a> DynamicReload<'a> {
     // If we can't read from it, we wait for 100 ms before we try again, if we can't
     // do it within 1 sec we give up
     //
-    fn try_copy(src: &Path, dest: &Path) -> bool {
+    fn try_copy(src: &Path, dest: &Path) -> Result<()> {
         for _ in 0..10 {
-            match fs::metadata(src) {
-                Ok(file) => {
-                    let len = file.len();
-                    if len > 0 {
-                        fs::copy(&src, &dest).unwrap();
-                        //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
-                        return true;
-                    }
-                }
-                _ => (),
+            if let Ok(file) = fs::metadata(src) {
+              let len = file.len();
+              if len > 0 {
+                  return match fs::copy(&src, &dest) {
+                    Ok(_)  => Ok(()),
+                    Err(e) => Err(Error::Copy(e, src.to_path_buf(), dest.to_path_buf()))
+                  };
+                  //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
+              }
             }
 
             thread::sleep(Duration::from_millis(100));
         }
 
-        false
+        Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
     fn get_watcher(tx: Sender<Event>) -> Option<RecommendedWatcher> {
@@ -526,7 +517,7 @@ mod tests {
             match state {
                 UpdateState::Before => self.update_call_done = true,
                 UpdateState::After => self.after_update_done  = true,
-                UpdateState::ReloadFalied => self.fail_update_done  = true,
+                UpdateState::ReloadFalied(_) => self.fail_update_done  = true,
             }
         }
     }

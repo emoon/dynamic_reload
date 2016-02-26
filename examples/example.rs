@@ -31,7 +31,7 @@ impl Plugins {
         match state {
             UpdateState::Before => Self::unload_plugins(self, lib.unwrap()),
             UpdateState::After => Self::reload_plugin(self, lib.unwrap()),
-            UpdateState::ReloadFalied => println!("Failed to reload"),
+            UpdateState::ReloadFalied(_) => println!("Failed to reload"),
         }
     }
 }
