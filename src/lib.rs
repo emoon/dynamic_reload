@@ -134,16 +134,16 @@ impl<'a> DynamicReload<'a> {
     pub fn new(search_paths: Option<Vec<&'a str>>,
                shadow_dir: Option<&'a str>,
                _search: Search)
-               -> DynamicReload<'a> {
-        let (tx, rx) = channel();
-        DynamicReload {
-            libs: Vec::new(),
-            watcher: Self::get_watcher(tx),
-            shadow_dir: Self::get_temp_dir(shadow_dir),
-            watch_recv: rx,
-            search_paths: Self::get_search_paths(search_paths),
+        -> DynamicReload<'a> {
+            let (tx, rx) = channel();
+            DynamicReload {
+                libs: Vec::new(),
+                watcher: Self::get_watcher(tx),
+                shadow_dir: Self::get_temp_dir(shadow_dir),
+                watch_recv: rx,
+                search_paths: Self::get_search_paths(search_paths),
+            }
         }
-    }
 
     ///
     /// Add a library to be loaded and to be reloaded once updated.
@@ -175,21 +175,21 @@ impl<'a> DynamicReload<'a> {
     pub fn add_library(&mut self,
                        name: &str,
                        name_format: PlatformName)
-                       -> Result<Rc<Lib>> {
-        match Self::try_load_library(self, name, name_format) {
-            Ok(lib) => {
-                if let Some(w) = self.watcher.as_mut() {
-                    if let Some(path) = lib.original_path.as_ref() {
-                        let _ = w.watch(path);
+        -> Result<Rc<Lib>> {
+            match Self::try_load_library(self, name, name_format) {
+                Ok(lib) => {
+                    if let Some(w) = self.watcher.as_mut() {
+                        if let Some(path) = lib.original_path.as_ref() {
+                            let _ = w.watch(path);
+                        }
                     }
+                    // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
+                    self.libs.push(lib.clone());
+                    Ok(lib)
                 }
-                // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
-                self.libs.push(lib.clone());
-                Ok(lib)
+                Err(e) => Err(e),
             }
-            Err(e) => Err(e),
         }
-    }
 
     ///
     /// Needs to be called in order to handle reloads of libraries.
@@ -238,14 +238,14 @@ impl<'a> DynamicReload<'a> {
                          ref update_call: F,
                          data: &mut T)
         where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
-    {
-        let len = self.libs.len();
-        for i in (0..len).rev() {
-            if Self::should_reload(file_path, &self.libs[i]) {
-                Self::reload_lib(self, i, file_path, update_call, data);
+        {
+            let len = self.libs.len();
+            for i in (0..len).rev() {
+                if Self::should_reload(file_path, &self.libs[i]) {
+                    Self::reload_lib(self, i, file_path, update_call, data);
+                }
             }
         }
-    }
 
     fn reload_lib<F, T>(&mut self,
                         index: usize,
@@ -253,33 +253,33 @@ impl<'a> DynamicReload<'a> {
                         ref update_call: F,
                         data: &mut T)
         where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
-    {
-        update_call(data, UpdateState::Before, Some(&self.libs[index]));
-        self.libs.swap_remove(index);
+        {
+            update_call(data, UpdateState::Before, Some(&self.libs[index]));
+            self.libs.swap_remove(index);
 
-        match Self::load_library(self, file_path) {
-            Ok(lib) => {
-                self.libs.push(lib.clone());
-                update_call(data, UpdateState::After, Some(&lib));
-            }
+            match Self::load_library(self, file_path) {
+                Ok(lib) => {
+                    self.libs.push(lib.clone());
+                    update_call(data, UpdateState::After, Some(&lib));
+                }
 
-            Err(err) => {
-                update_call(data, UpdateState::ReloadFalied(err), None);
-                //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
+                Err(err) => {
+                    update_call(data, UpdateState::ReloadFalied(err), None);
+                    //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
+                }
             }
         }
-    }
 
 
     fn try_load_library(&self,
                         name: &str,
                         name_format: PlatformName)
-                        -> Result<Rc<Lib>> {
-        match Self::search_dirs(self, name, name_format) {
-          Some(path) => Self::load_library(self, &path),
-          None => Err(Error::Find(name.into())),
+        -> Result<Rc<Lib>> {
+            match Self::search_dirs(self, name, name_format) {
+                Some(path) => Self::load_library(self, &path),
+                None => Err(Error::Find(name.into())),
+            }
         }
-    }
 
 
     fn load_library(&self, full_path: &PathBuf) -> Result<Rc<Lib>> {
@@ -415,14 +415,14 @@ impl<'a> DynamicReload<'a> {
     fn try_copy(src: &Path, dest: &Path) -> Result<()> {
         for _ in 0..10 {
             if let Ok(file) = fs::metadata(src) {
-              let len = file.len();
-              if len > 0 {
-                  return match fs::copy(&src, &dest) {
-                    Ok(_)  => Ok(()),
-                    Err(e) => Err(Error::Copy(e, src.to_path_buf(), dest.to_path_buf()))
-                  };
-                  //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
-              }
+                let len = file.len();
+                if len > 0 {
+                    return match fs::copy(&src, &dest) {
+                        Ok(_)  => Ok(()),
+                        Err(e) => Err(Error::Copy(e, src.to_path_buf(), dest.to_path_buf()))
+                    };
+                    //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
+                }
             }
 
             thread::sleep(Duration::from_millis(100));
@@ -437,7 +437,7 @@ impl<'a> DynamicReload<'a> {
             Err(e) => {
                 println!("Unable to create file watcher, no dynamic reloading will be done, \
                           error: {:?}",
-                         e);
+                          e);
                 None
             }
         }
@@ -472,13 +472,13 @@ impl<'a> DynamicReload<'a> {
 
     /// Formats dll name on *nix ("test_foo" -> "libtest_foo.so")
     #[cfg(any(target_os="linux",
-            target_os="freebsd",
-            target_os="dragonfly",
-            target_os="netbsd",
-            target_os="openbsd"))]
-    fn get_dynamiclib_name(name: &str) -> String {
-        format!("lib{}.so", name)
-    }
+              target_os="freebsd",
+              target_os="dragonfly",
+              target_os="netbsd",
+              target_os="openbsd"))]
+        fn get_dynamiclib_name(name: &str) -> String {
+            format!("lib{}.so", name)
+        }
 }
 
 impl PartialEq for Lib {
@@ -535,7 +535,7 @@ mod tests {
     #[test]
     fn test_search_paths_some() {
         assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
-                   2);
+        2);
     }
 
     #[test]
@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn test_is_file_fail() {
         assert!(DynamicReload::is_file(&Path::new("haz_no_file_with_this_name").to_path_buf())
-                    .is_none());
+                .is_none());
     }
 
     #[test]
@@ -575,13 +575,13 @@ mod tests {
     #[cfg(target_os="macos")]
     fn test_get_library_name_mac() {
         assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::Yes),
-                   "libfoobar.dylib");
+        "libfoobar.dylib");
     }
 
     #[test]
     fn test_get_library_name() {
         assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::No),
-                   "foobar");
+        "foobar");
     }
 
     #[test]
