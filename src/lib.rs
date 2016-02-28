@@ -683,7 +683,7 @@ mod tests {
 
         dest_path.set_file_name(&test_file);
 
-        DynamicReload::try_copy(&target_path, &dest_path);
+        let _ = DynamicReload::try_copy(&target_path, &dest_path);
 
         // Wait a while before open the file. Not sure why this is needed.
         thread::sleep(Duration::from_millis(100));
@@ -724,7 +724,7 @@ mod tests {
 
         dest_path.set_file_name(&test_file);
 
-        DynamicReload::try_copy(&target_path, &dest_path);
+        let _ = DynamicReload::try_copy(&target_path, &dest_path);
         thread::sleep(Duration::from_millis(100));
 
         let lib0 = dr.add_library(&test_file, PlatformName::No).unwrap();
