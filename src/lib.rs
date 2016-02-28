@@ -41,7 +41,6 @@ pub use self::error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Contains the information for a loaded library.
-///
 pub struct Lib {
     /// The actual loaded library. Refer to the libloading documentation on how to use this.
     pub lib: Library,
@@ -53,7 +52,6 @@ pub struct Lib {
 }
 
 /// Contains information about loaded libraries and also tracks search paths and reloading events.
-///
 pub struct DynamicReload<'a> {
     libs: Vec<Rc<Lib>>,
     watcher: Option<RecommendedWatcher>,
@@ -64,7 +62,6 @@ pub struct DynamicReload<'a> {
 
 /// Searching for a shared library can be done in current directory, but can also be allowed to
 /// search backwards.
-///
 pub enum Search {
     /// Search in current directory only
     Default,
@@ -73,7 +70,6 @@ pub enum Search {
 }
 
 /// This is the states that the callback function supplied to [update](struct.DynamicReload.html#method.update) can be called with.
-///
 pub enum UpdateState {
     /// Set when a shared library is about to be reloaded. Gives the application time to save state,
     /// do clean up, etc
@@ -86,7 +82,6 @@ pub enum UpdateState {
 }
 
 /// This is used to decide how the name used for [add_library](struct.DynamicReload.html#method.add_library) is to be handled.
-///
 #[derive(PartialEq)]
 pub enum PlatformName {
     /// Leave name as is and don't do any formating.

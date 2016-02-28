@@ -22,7 +22,7 @@ Usage
 ```toml
 # Cargo.toml
 [dependencies]
-dynamic_reload = "0.1.2"
+dynamic_reload = "0.2.0"
 
 ```
 
@@ -72,7 +72,7 @@ impl Plugins {
         match state {
             UpdateState::Before => Self::unload_plugins(self, lib.unwrap()),
             UpdateState::After => Self::reload_plugin(self, lib.unwrap()),
-            UpdateState::ReloadFalied => println!("Failed to reload"),
+            UpdateState::ReloadFalied(_) => println!("Failed to reload"),
         }
     }
 }
