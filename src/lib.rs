@@ -78,7 +78,7 @@ pub enum UpdateState {
     After,
     /// In case reloading of the library failed (broken file, etc) this will be set and allow the
     /// application to to deal with the issue.
-    ReloadFalied(Error),
+    ReloadFailed(Error),
 }
 
 /// This is used to decide how the name used for [add_library](struct.DynamicReload.html#method.add_library) is to be handled.
@@ -202,7 +202,7 @@ impl<'a> DynamicReload<'a> {
     ///        match state {
     ///            UpdateState::Before => // save state, remove from lists, etc, here
     ///            UpdateState::After => // shared lib reloaded, re-add, restore state
-    ///            UpdateState::ReloadFalied(Error) => // shared lib failed to reload due to error
+    ///            UpdateState::ReloadFailed(Error) => // shared lib failed to reload due to error
     ///        }
     ///    }
     /// }
@@ -259,7 +259,7 @@ impl<'a> DynamicReload<'a> {
                 }
 
                 Err(err) => {
-                    update_call(data, UpdateState::ReloadFalied(err), None);
+                    update_call(data, UpdateState::ReloadFailed(err), None);
                     //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
                 }
             }
@@ -510,7 +510,7 @@ mod tests {
             match state {
                 UpdateState::Before => self.update_call_done = true,
                 UpdateState::After => self.after_update_done  = true,
-                UpdateState::ReloadFalied(_) => self.fail_update_done  = true,
+                UpdateState::ReloadFailed(_) => self.fail_update_done  = true,
             }
         }
     }
