@@ -189,7 +189,7 @@ impl<'a> DynamicReload<'a> {
     ///
     /// Needs to be called in order to handle reloads of libraries.
     ///
-    /// ```update_call``` funcion with its data needs to be supplied to allow the application to
+    /// ```update_call``` function with its data needs to be supplied to allow the application to
     /// take appropriate action depending on what needs to be done with the loaded library.
     ///
     /// ```ignore
