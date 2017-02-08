@@ -517,7 +517,7 @@ mod tests {
 
     fn get_test_shared_lib() -> PathBuf {
         let exe_path = env::current_exe().unwrap();
-        let lib_path = exe_path.parent().unwrap();
+        let lib_path = exe_path.parent().unwrap().parent().unwrap();
         let lib_name = "test_shared";
         Path::new(&lib_path).join(DynamicReload::get_dynamiclib_name(lib_name))
     }

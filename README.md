@@ -19,7 +19,7 @@ Usage
 ```toml
 # Cargo.toml
 [dependencies]
-dynamic_reload = "0.2.0"
+dynamic_reload = "0.2.1"
 
 ```
 

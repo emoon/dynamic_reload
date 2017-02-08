@@ -2,6 +2,10 @@
 
 This project follows semantic versioning.
 
+### v0.2.1 (2017-02-08)
+
+- [changed] Updated libloading to 0.3.0
+
 ### v0.2.0 (2016-02-28)
 
 - [changed] All errors now uses a Error enum instead of a string. Thanks to Victor M. Suarez for this PR.
