@@ -1,20 +1,20 @@
 extern crate dynamic_reload;
 
 use dynamic_reload::{DynamicReload, Lib, Symbol, Search, PlatformName, UpdateState};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 use std::thread;
 
 struct Plugins {
-    plugins: Vec<Rc<Lib>>,
+    plugins: Vec<Arc<Lib>>,
 }
 
 impl Plugins {
-    fn add_plugin(&mut self, plugin: &Rc<Lib>) {
+    fn add_plugin(&mut self, plugin: &Arc<Lib>) {
         self.plugins.push(plugin.clone());
     }
 
-    fn unload_plugins(&mut self, lib: &Rc<Lib>) {
+    fn unload_plugins(&mut self, lib: &Arc<Lib>) {
         for i in (0..self.plugins.len()).rev() {
             if &self.plugins[i] == lib {
                 self.plugins.swap_remove(i);
@@ -22,12 +22,12 @@ impl Plugins {
         }
     }
 
-    fn reload_plugin(&mut self, lib: &Rc<Lib>) {
+    fn reload_plugin(&mut self, lib: &Arc<Lib>) {
         Self::add_plugin(self, lib);
     }
 
     // called when a lib needs to be reloaded.
-    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Rc<Lib>>) {
+    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Arc<Lib>>) {
         match state {
             UpdateState::Before => Self::unload_plugins(self, lib.unwrap()),
             UpdateState::After => Self::reload_plugin(self, lib.unwrap()),

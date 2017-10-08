@@ -24,7 +24,7 @@ extern crate tempdir;
 
 use libloading::Library;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use notify::{RecommendedWatcher, Watcher, Event};
 use tempdir::TempDir;
@@ -53,7 +53,7 @@ pub struct Lib {
 
 /// Contains information about loaded libraries and also tracks search paths and reloading events.
 pub struct DynamicReload<'a> {
-    libs: Vec<Rc<Lib>>,
+    libs: Vec<Arc<Lib>>,
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'a str>,
@@ -170,7 +170,7 @@ impl<'a> DynamicReload<'a> {
     pub fn add_library(&mut self,
                        name: &str,
                        name_format: PlatformName)
-        -> Result<Rc<Lib>> {
+        -> Result<Arc<Lib>> {
             match Self::try_load_library(self, name, name_format) {
                 Ok(lib) => {
                     if let Some(w) = self.watcher.as_mut() {
@@ -198,7 +198,7 @@ impl<'a> DynamicReload<'a> {
     /// }
     ///
     /// impl Plugins {
-    ///    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Rc<Lib>>) {
+    ///    fn reload_callback(&mut self, state: UpdateState, lib: Option<&Arc<Lib>>) {
     ///        match state {
     ///            UpdateState::Before => // save state, remove from lists, etc, here
     ///            UpdateState::After => // shared lib reloaded, re-add, restore state
@@ -215,7 +215,7 @@ impl<'a> DynamicReload<'a> {
     /// }
     /// ```
     ///
-    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
+    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
     {
         match self.watch_recv.try_recv() {
             Ok(file) => {
@@ -232,7 +232,7 @@ impl<'a> DynamicReload<'a> {
                          file_path: &PathBuf,
                          ref update_call: F,
                          data: &mut T)
-        where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
+        where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
         {
             let len = self.libs.len();
             for i in (0..len).rev() {
@@ -247,7 +247,7 @@ impl<'a> DynamicReload<'a> {
                         file_path: &PathBuf,
                         ref update_call: F,
                         data: &mut T)
-        where F: Fn(&mut T, UpdateState, Option<&Rc<Lib>>)
+        where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
         {
             update_call(data, UpdateState::Before, Some(&self.libs[index]));
             self.libs.swap_remove(index);
@@ -269,7 +269,7 @@ impl<'a> DynamicReload<'a> {
     fn try_load_library(&self,
                         name: &str,
                         name_format: PlatformName)
-        -> Result<Rc<Lib>> {
+        -> Result<Arc<Lib>> {
             match Self::search_dirs(self, name, name_format) {
                 Some(path) => Self::load_library(self, &path),
                 None => Err(Error::Find(name.into())),
@@ -277,7 +277,7 @@ impl<'a> DynamicReload<'a> {
         }
 
 
-    fn load_library(&self, full_path: &PathBuf) -> Result<Rc<Lib>> {
+    fn load_library(&self, full_path: &PathBuf) -> Result<Arc<Lib>> {
         let path;
         let original_path;
 
@@ -293,10 +293,10 @@ impl<'a> DynamicReload<'a> {
         Self::init_library(original_path, path)
     }
 
-    fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Rc<Lib>> {
+    fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Arc<Lib>> {
         match Library::new(&path) {
             Ok(l) => {
-                Ok(Rc::new(Lib {
+                Ok(Arc::new(Lib {
                     original_path: org_path,
                     loaded_path: path,
                     lib: l,
@@ -495,7 +495,7 @@ mod tests {
     use std::env;
     use std::thread;
     use std::time::Duration;
-    use std::rc::Rc;
+    use std::sync::Arc;
     use std::fs;
 
     #[derive(Default)]
@@ -506,7 +506,7 @@ mod tests {
     }
 
     impl TestNotifyCallback {
-        fn update_call(&mut self, state: UpdateState, _lib: Option<&Rc<Lib>>) {
+        fn update_call(&mut self, state: UpdateState, _lib: Option<&Arc<Lib>>) {
             match state {
                 UpdateState::Before => self.update_call_done = true,
                 UpdateState::After => self.after_update_done  = true,
