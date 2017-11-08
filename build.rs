@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process::Command;
 
 fn main() {
-	let profile = env::var("PROFILE").unwrap_or("Debug".to_string());
+    let profile = env::var("PROFILE").unwrap_or("Debug".to_string());
     let current_dir = std::env::current_dir().unwrap();
     let target;
 
