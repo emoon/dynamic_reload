@@ -219,10 +219,17 @@ impl<'a> DynamicReload<'a> {
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
     {
         while let Ok(evt) = self.watch_recv.try_recv() {
-            Self::reload_libs(self,
-                              evt.path.as_ref().unwrap(),
-                              update_call,
-                              data);
+            use notify::op::*;
+            match evt {
+                notify::RawEvent{path: Some(ref path), op: Ok(op), ..}
+                 if op == CLOSE_WRITE || op == CREATE => {
+                    Self::reload_libs(self,
+                                      path,
+                                      update_call,
+                                      data);
+                },
+                _ => (),
+            }
         }
     }
 
