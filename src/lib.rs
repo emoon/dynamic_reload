@@ -26,7 +26,7 @@ use libloading::Library;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Receiver, Sender};
-use notify::{RecommendedWatcher, Watcher, Event};
+use notify::{RecommendedWatcher, Watcher};
 use tempdir::TempDir;
 use std::time::Duration;
 use std::thread;
@@ -57,7 +57,7 @@ pub struct DynamicReload<'a> {
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'a str>,
-    watch_recv: Receiver<Event>,
+    watch_recv: Receiver<notify::RawEvent>,
 }
 
 /// Searching for a shared library can be done in current directory, but can also be allowed to
@@ -217,14 +217,11 @@ impl<'a> DynamicReload<'a> {
     ///
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
     {
-        match self.watch_recv.try_recv() {
-            Ok(file) => {
-                Self::reload_libs(self,
-                                  file.path.as_ref().unwrap(),
-                                  update_call,
-                                  data)
-            }
-            _ => (),
+        while let Ok(evt) = self.watch_recv.try_recv() {
+            Self::reload_libs(self,
+                              evt.path.as_ref().unwrap(),
+                              update_call,
+                              data);
         }
     }
 
@@ -426,8 +423,8 @@ impl<'a> DynamicReload<'a> {
         Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
-    fn get_watcher(tx: Sender<Event>) -> Option<RecommendedWatcher> {
-        match Watcher::new(tx) {
+    fn get_watcher(tx: Sender<notify::RawEvent>) -> Option<RecommendedWatcher> {
+        match notify::raw_watcher(tx) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!("Unable to create file watcher, no dynamic reloading will be done, \
