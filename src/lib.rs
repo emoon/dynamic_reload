@@ -175,7 +175,8 @@ impl<'a> DynamicReload<'a> {
                 Ok(lib) => {
                     if let Some(w) = self.watcher.as_mut() {
                         if let Some(path) = lib.original_path.as_ref() {
-                            let _ = w.watch(path);
+                            let parent = path.as_path().parent().unwrap();
+                            let _ = w.watch(parent, notify::RecursiveMode::NonRecursive);
                         }
                     }
                     // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
