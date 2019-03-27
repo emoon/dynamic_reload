@@ -28,6 +28,7 @@ impl StdError for Error {
         }
     }
 
+    #[allow(deprecated)]
     fn cause(&self) -> Option<&StdError> {
         match *self {
             Error::Load(ref e) => e.cause(),
@@ -39,6 +40,7 @@ impl StdError for Error {
 }
 
 impl fmt::Display for Error {
+    #[allow(deprecated)]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Error::Load(ref e) => {
