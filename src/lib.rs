@@ -57,7 +57,7 @@ pub struct DynamicReload<'a> {
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'a str>,
-    watch_recv: Receiver<notify::RawEvent>,
+    watch_recv: Receiver<notify::DebouncedEvent>,
 }
 
 /// Searching for a shared library can be done in current directory, but can also be allowed to
@@ -219,10 +219,9 @@ impl<'a> DynamicReload<'a> {
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
     {
         while let Ok(evt) = self.watch_recv.try_recv() {
-            use notify::op::*;
+            use notify::DebouncedEvent::*;
             match evt {
-                notify::RawEvent{path: Some(ref path), op: Ok(op), ..}
-                 if op == CLOSE_WRITE || op == CREATE || op == WRITE => {
+                NoticeWrite(ref path) | Write(ref path) | Create(ref path) => {
                     Self::reload_libs(self,
                                       path,
                                       update_call,
@@ -431,8 +430,8 @@ impl<'a> DynamicReload<'a> {
         Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
-    fn get_watcher(tx: Sender<notify::RawEvent>) -> Option<RecommendedWatcher> {
-        match notify::raw_watcher(tx) {
+    fn get_watcher(tx: Sender<notify::DebouncedEvent>) -> Option<RecommendedWatcher> {
+        match notify::watcher(tx, Duration::from_secs(2)) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!("Unable to create file watcher, no dynamic reloading will be done, \
