@@ -417,11 +417,11 @@ impl<'a> DynamicReload<'a> {
             if let Ok(file) = fs::metadata(src) {
                 let len = file.len();
                 if len > 0 {
-                    return match fs::copy(&src, &dest) {
-                        Ok(_)  => Ok(()),
-                        Err(e) => Err(Error::Copy(e, src.to_path_buf(), dest.to_path_buf()))
+                    // ignore copy errors, library file might be locked by the compiler
+                    match fs::copy(&src, &dest) {
+                        Ok(_)  => return Ok(()),
+                        Err(_) => (),
                     };
-                    //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
                 }
             }
 
