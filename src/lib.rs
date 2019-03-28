@@ -222,7 +222,7 @@ impl<'a> DynamicReload<'a> {
             use notify::op::*;
             match evt {
                 notify::RawEvent{path: Some(ref path), op: Ok(op), ..}
-                 if op == CLOSE_WRITE || op == CREATE => {
+                 if op == CLOSE_WRITE || op == CREATE || op == WRITE => {
                     Self::reload_libs(self,
                                       path,
                                       update_call,
