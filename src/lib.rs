@@ -312,7 +312,8 @@ impl<'a> DynamicReload<'a> {
 
     fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
         if let Some(p) = lib.original_path.as_ref() {
-            if reload_path.to_str().unwrap().contains(p.to_str().unwrap()) {
+            // Check if file names match.
+            if reload_path.file_name() == p.file_name() {
                 return true;
             }
         }
