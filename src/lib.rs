@@ -254,7 +254,7 @@ impl<'a> DynamicReload<'a> {
         where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
         {
             update_call(data, UpdateState::Before, Some(&self.libs[index]));
-            self.libs.swap_remove(index);
+            self.remove_lib(index);
 
             match Self::load_library(self, file_path) {
                 Ok(lib) => {
@@ -286,7 +286,7 @@ impl<'a> DynamicReload<'a> {
         let original_path;
 
         if let Some(sd) = self.shadow_dir.as_ref() {
-            path = sd.path().join(full_path.file_name().unwrap());
+            path = Self::format_filename(sd.path(), full_path);
             try!(Self::try_copy(&full_path, &path));
             original_path = Some(full_path.clone());
         } else {
@@ -456,6 +456,28 @@ impl<'a> DynamicReload<'a> {
         } else {
             name.to_string()
         }
+    }
+
+    fn remove_lib(&mut self, idx: usize) {
+        #[cfg(feature = "no-unload")]
+        std::mem::forget(self.libs.swap_remove(idx));
+
+        #[cfg(not(feature = "no-unload"))]
+        self.libs.swap_remove(idx);
+
+    }
+
+    #[cfg(not(feature = "no-timestamps"))]
+    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards");
+        let filename = full_path.file_name().unwrap();
+        shadow_dir.join(format!("{}_{}", ts.as_millis(), filename.to_str().unwrap()))
+    }
+
+    #[cfg(feature = "no-timestamps")]
+    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+        shadow_dir.join(full_path.file_name().unwrap())
     }
 
     /// Formats dll name on Windows ("test_foo" -> "test_foo.dll")

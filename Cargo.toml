@@ -10,6 +10,13 @@ homepage = "https://github.com/emoon/dynamic_reload"
 documentation = "http://prodbg.com/dynamic_reload/dynamic_reload/index.html"
 build = "build.rs"
 
+[features]
+# Don't add timestamps to shadow copy.
+no-timestamps = []
+
+# Don't unload old library.
+no-unload = []
+
 [dependencies]
 notify = "4.0.*"
 libc = "0.2.0"
