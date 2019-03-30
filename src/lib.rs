@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_search_paths_some() {
-        assert_eq!(DynamicReload::get_search_paths(Some(vec!["src", "examples"])).len(),
+        assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
         2);
     }
 
