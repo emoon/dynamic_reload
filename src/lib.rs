@@ -32,7 +32,6 @@ use std::time::Duration;
 use std::thread;
 use std::fs;
 use std::env;
-use std::ffi::OsStr;
 
 pub use libloading::Symbol;
 
@@ -321,12 +320,7 @@ impl<'a> DynamicReload {
     fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
         if let Some(p) = lib.original_path.as_ref() {
             if reload_path.to_str().unwrap().contains(p.to_str().unwrap()) {
-                if cfg!(windows) {
-                    return reload_path.extension() == Some(OsStr::new("dll"));
-                } else {
-                    return true;
-                }
-                
+                return true;
             }
         }
 
@@ -335,6 +329,8 @@ impl<'a> DynamicReload {
 
     fn search_dirs(&self, name: &str, name_format: PlatformName) -> Option<PathBuf> {
         let lib_name = Self::get_library_name(name, name_format);
+
+        println!("LIB NAME: {:?}", lib_name);
 
         // 1. Search the current directory
         if let Some(path) = Self::search_current_dir(&lib_name) {
@@ -457,7 +453,10 @@ impl<'a> DynamicReload {
 
     fn get_search_paths(search_paths: Option<Vec<&str>>) -> Vec<PathBuf> {
         match search_paths {
-            Some(paths) => paths.iter().map(|p| Path::new(p).to_path_buf().canonicalize().unwrap() ).collect(),
+            Some(paths) => paths.iter().map(|p| {
+                let path_buf = Path::new(p).to_path_buf();
+                path_buf.canonicalize().unwrap_or(path_buf)
+            }).collect(),
             None => Vec::new(),
         }
     }
@@ -546,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_search_paths_some() {
-        assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
+        assert_eq!(DynamicReload::get_search_paths(Some(vec!["src", "examples"])).len(),
         2);
     }
 
