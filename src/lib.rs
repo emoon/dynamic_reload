@@ -330,8 +330,6 @@ impl<'a> DynamicReload {
     fn search_dirs(&self, name: &str, name_format: PlatformName) -> Option<PathBuf> {
         let lib_name = Self::get_library_name(name, name_format);
 
-        println!("LIB NAME: {:?}", lib_name);
-
         // 1. Search the current directory
         if let Some(path) = Self::search_current_dir(&lib_name) {
             return Some(path);
