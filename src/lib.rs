@@ -52,11 +52,11 @@ pub struct Lib {
 }
 
 /// Contains information about loaded libraries and also tracks search paths and reloading events.
-pub struct DynamicReload<'a> {
+pub struct DynamicReload {
     libs: Vec<Arc<Lib>>,
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
-    search_paths: Vec<&'a str>,
+    search_paths: Vec<PathBuf>,
     watch_recv: Receiver<notify::DebouncedEvent>,
 }
 
@@ -96,7 +96,7 @@ pub enum PlatformName {
     Yes,
 }
 
-impl<'a> DynamicReload<'a> {
+impl<'a> DynamicReload {
     ///
     /// Creates a DynamicReload object.
     ///
@@ -129,7 +129,7 @@ impl<'a> DynamicReload<'a> {
     pub fn new(search_paths: Option<Vec<&'a str>>,
                shadow_dir: Option<&'a str>,
                _search: Search)
-        -> DynamicReload<'a> {
+        -> DynamicReload {
             let (tx, rx) = channel();
             DynamicReload {
                 libs: Vec::new(),
@@ -176,7 +176,13 @@ impl<'a> DynamicReload<'a> {
                     if let Some(w) = self.watcher.as_mut() {
                         if let Some(path) = lib.original_path.as_ref() {
                             let parent = path.as_path().parent().unwrap();
-                            let _ = w.watch(parent, notify::RecursiveMode::NonRecursive);
+                            let parent_buf = if cfg!(windows) {
+                                parent.to_path_buf().canonicalize().unwrap()
+                            } else {
+                                parent.to_path_buf()
+                            };
+
+                            let _ = w.watch(parent_buf, notify::RecursiveMode::NonRecursive);
                         }
                     }
                     // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
@@ -443,9 +449,12 @@ impl<'a> DynamicReload<'a> {
         }
     }
 
-    fn get_search_paths(search_paths: Option<Vec<&str>>) -> Vec<&str> {
+    fn get_search_paths(search_paths: Option<Vec<&str>>) -> Vec<PathBuf> {
         match search_paths {
-            Some(paths) => paths.clone(),
+            Some(paths) => paths.iter().map(|p| {
+                let path_buf = Path::new(p).to_path_buf();
+                path_buf.canonicalize().unwrap_or(path_buf)
+            }).collect(),
             None => Vec::new(),
         }
     }
