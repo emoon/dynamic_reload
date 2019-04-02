@@ -57,7 +57,7 @@ pub struct DynamicReload<'a> {
     watcher: Option<RecommendedWatcher>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<&'a str>,
-    watch_recv: Receiver<notify::RawEvent>,
+    watch_recv: Receiver<notify::DebouncedEvent>,
 }
 
 /// Searching for a shared library can be done in current directory, but can also be allowed to
@@ -219,10 +219,9 @@ impl<'a> DynamicReload<'a> {
     pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
     {
         while let Ok(evt) = self.watch_recv.try_recv() {
-            use notify::op::*;
+            use notify::DebouncedEvent::*;
             match evt {
-                notify::RawEvent{path: Some(ref path), op: Ok(op), ..}
-                 if op == CLOSE_WRITE || op == CREATE || op == WRITE => {
+                NoticeWrite(ref path) | Write(ref path) | Create(ref path) => {
                     Self::reload_libs(self,
                                       path,
                                       update_call,
@@ -255,7 +254,7 @@ impl<'a> DynamicReload<'a> {
         where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
         {
             update_call(data, UpdateState::Before, Some(&self.libs[index]));
-            self.libs.swap_remove(index);
+            self.remove_lib(index);
 
             match Self::load_library(self, file_path) {
                 Ok(lib) => {
@@ -287,7 +286,7 @@ impl<'a> DynamicReload<'a> {
         let original_path;
 
         if let Some(sd) = self.shadow_dir.as_ref() {
-            path = sd.path().join(full_path.file_name().unwrap());
+            path = Self::format_filename(sd.path(), full_path);
             try!(Self::try_copy(&full_path, &path));
             original_path = Some(full_path.clone());
         } else {
@@ -313,7 +312,8 @@ impl<'a> DynamicReload<'a> {
 
     fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
         if let Some(p) = lib.original_path.as_ref() {
-            if reload_path.to_str().unwrap().contains(p.to_str().unwrap()) {
+            // Check if file names match.
+            if reload_path.file_name() == p.file_name() {
                 return true;
             }
         }
@@ -417,11 +417,11 @@ impl<'a> DynamicReload<'a> {
             if let Ok(file) = fs::metadata(src) {
                 let len = file.len();
                 if len > 0 {
-                    return match fs::copy(&src, &dest) {
-                        Ok(_)  => Ok(()),
-                        Err(e) => Err(Error::Copy(e, src.to_path_buf(), dest.to_path_buf()))
+                    // ignore copy errors, library file might be locked by the compiler
+                    match fs::copy(&src, &dest) {
+                        Ok(_)  => return Ok(()),
+                        Err(_) => (),
                     };
-                    //println!("Copy from {} {}", src.to_str().unwrap(), dest.to_str().unwrap());
                 }
             }
 
@@ -431,8 +431,8 @@ impl<'a> DynamicReload<'a> {
         Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
-    fn get_watcher(tx: Sender<notify::RawEvent>) -> Option<RecommendedWatcher> {
-        match notify::raw_watcher(tx) {
+    fn get_watcher(tx: Sender<notify::DebouncedEvent>) -> Option<RecommendedWatcher> {
+        match notify::watcher(tx, Duration::from_secs(2)) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!("Unable to create file watcher, no dynamic reloading will be done, \
@@ -456,6 +456,28 @@ impl<'a> DynamicReload<'a> {
         } else {
             name.to_string()
         }
+    }
+
+    fn remove_lib(&mut self, idx: usize) {
+        #[cfg(feature = "no-unload")]
+        std::mem::forget(self.libs.swap_remove(idx));
+
+        #[cfg(not(feature = "no-unload"))]
+        self.libs.swap_remove(idx);
+
+    }
+
+    #[cfg(not(feature = "no-timestamps"))]
+    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards");
+        let filename = full_path.file_name().unwrap();
+        shadow_dir.join(format!("{}_{}", ts.as_millis(), filename.to_str().unwrap()))
+    }
+
+    #[cfg(feature = "no-timestamps")]
+    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+        shadow_dir.join(full_path.file_name().unwrap())
     }
 
     /// Formats dll name on Windows ("test_foo" -> "test_foo.dll")
