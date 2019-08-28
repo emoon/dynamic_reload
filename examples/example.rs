@@ -1,9 +1,9 @@
 extern crate dynamic_reload;
 
-use dynamic_reload::{DynamicReload, Lib, Symbol, Search, PlatformName, UpdateState};
+use dynamic_reload::{DynamicReload, Lib, PlatformName, Search, Symbol, UpdateState};
 use std::sync::Arc;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 struct Plugins {
     plugins: Vec<Arc<Lib>>,
@@ -37,14 +37,18 @@ impl Plugins {
 }
 
 fn main() {
-    let mut plugs = Plugins { plugins: Vec::new() };
+    let mut plugs = Plugins {
+        plugins: Vec::new(),
+    };
 
     // Setup the reload handler. A temporary directory will be created inside the target/debug
     // where plugins will be loaded from. That is because on some OS:es loading a shared lib
     // will lock the file so we can't overwrite it so this works around that issue.
-    let mut reload_handler = DynamicReload::new(Some(vec!["target/debug"]),
-                                                Some("target/debug"),
-                                                Search::Default);
+    let mut reload_handler = DynamicReload::new(
+        Some(vec!["target/debug"]),
+        Some("target/debug"),
+        Search::Default,
+    );
 
     // test_shared is generated in build.rs
     match reload_handler.add_library("test_shared", PlatformName::Yes) {
@@ -63,9 +67,8 @@ fn main() {
         if plugs.plugins.len() > 0 {
             // In a real program you want to cache the symbol and not do it every time if your
             // application is performance critical
-            let fun: Symbol<extern "C" fn() -> i32> = unsafe {
-                plugs.plugins[0].lib.get(b"shared_fun\0").unwrap()
-            };
+            let fun: Symbol<extern "C" fn() -> i32> =
+                unsafe { plugs.plugins[0].lib.get(b"shared_fun\0").unwrap() };
 
             println!("Value {}", fun());
         }

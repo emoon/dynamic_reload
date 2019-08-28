@@ -18,20 +18,20 @@
 //! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 //!
 extern crate libc;
-extern crate notify;
 extern crate libloading;
+extern crate notify;
 extern crate tempdir;
 
 use libloading::Library;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::mpsc::{channel, Receiver, Sender};
 use notify::{RecommendedWatcher, Watcher};
-use tempdir::TempDir;
-use std::time::Duration;
-use std::thread;
-use std::fs;
 use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+use tempdir::TempDir;
 
 pub use libloading::Symbol;
 
@@ -126,19 +126,20 @@ impl<'a> DynamicReload {
     /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
     /// ```
     ///
-    pub fn new(search_paths: Option<Vec<&'a str>>,
-               shadow_dir: Option<&'a str>,
-               _search: Search)
-        -> DynamicReload {
-            let (tx, rx) = channel();
-            DynamicReload {
-                libs: Vec::new(),
-                watcher: Self::get_watcher(tx),
-                shadow_dir: Self::get_temp_dir(shadow_dir),
-                watch_recv: rx,
-                search_paths: Self::get_search_paths(search_paths),
-            }
+    pub fn new(
+        search_paths: Option<Vec<&'a str>>,
+        shadow_dir: Option<&'a str>,
+        _search: Search,
+    ) -> DynamicReload {
+        let (tx, rx) = channel();
+        DynamicReload {
+            libs: Vec::new(),
+            watcher: Self::get_watcher(tx),
+            shadow_dir: Self::get_temp_dir(shadow_dir),
+            watch_recv: rx,
+            search_paths: Self::get_search_paths(search_paths),
         }
+    }
 
     ///
     /// Add a library to be loaded and to be reloaded once updated.
@@ -167,31 +168,28 @@ impl<'a> DynamicReload {
     /// add_library("test_lib", PlatformName::Yes)
     /// ```
     ///
-    pub fn add_library(&mut self,
-                       name: &str,
-                       name_format: PlatformName)
-        -> Result<Arc<Lib>> {
-            match Self::try_load_library(self, name, name_format) {
-                Ok(lib) => {
-                    if let Some(w) = self.watcher.as_mut() {
-                        if let Some(path) = lib.original_path.as_ref() {
-                            let parent = path.as_path().parent().unwrap();
-                            let parent_buf = if cfg!(windows) {
-                                parent.to_path_buf().canonicalize().unwrap()
-                            } else {
-                                parent.to_path_buf()
-                            };
+    pub fn add_library(&mut self, name: &str, name_format: PlatformName) -> Result<Arc<Lib>> {
+        match Self::try_load_library(self, name, name_format) {
+            Ok(lib) => {
+                if let Some(w) = self.watcher.as_mut() {
+                    if let Some(path) = lib.original_path.as_ref() {
+                        let parent = path.as_path().parent().unwrap();
+                        let parent_buf = if cfg!(windows) {
+                            parent.to_path_buf().canonicalize().unwrap()
+                        } else {
+                            parent.to_path_buf()
+                        };
 
-                            let _ = w.watch(parent_buf, notify::RecursiveMode::NonRecursive);
-                        }
+                        let _ = w.watch(parent_buf, notify::RecursiveMode::NonRecursive);
                     }
-                    // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
-                    self.libs.push(lib.clone());
-                    Ok(lib)
                 }
-                Err(e) => Err(e),
+                // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
+                self.libs.push(lib.clone());
+                Ok(lib)
             }
+            Err(e) => Err(e),
         }
+    }
 
     ///
     /// Needs to be called in order to handle reloads of libraries.
@@ -222,70 +220,64 @@ impl<'a> DynamicReload {
     /// }
     /// ```
     ///
-    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T) where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
+    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T)
+    where
+        F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
         while let Ok(evt) = self.watch_recv.try_recv() {
             use notify::DebouncedEvent::*;
             match evt {
                 NoticeWrite(ref path) | Write(ref path) | Create(ref path) => {
-                    Self::reload_libs(self,
-                                      path,
-                                      update_call,
-                                      data);
-                },
+                    Self::reload_libs(self, path, update_call, data);
+                }
                 _ => (),
             }
         }
     }
 
-    fn reload_libs<F, T>(&mut self,
-                         file_path: &PathBuf,
-                         ref update_call: F,
-                         data: &mut T)
-        where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
-        {
-            let len = self.libs.len();
-            for i in (0..len).rev() {
-                if Self::should_reload(file_path, &self.libs[i]) {
-                    Self::reload_lib(self, i, file_path, update_call, data);
-                }
+    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, ref update_call: F, data: &mut T)
+    where
+        F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
+    {
+        let len = self.libs.len();
+        for i in (0..len).rev() {
+            if Self::should_reload(file_path, &self.libs[i]) {
+                Self::reload_lib(self, i, file_path, update_call, data);
             }
         }
+    }
 
-    fn reload_lib<F, T>(&mut self,
-                        index: usize,
-                        file_path: &PathBuf,
-                        ref update_call: F,
-                        data: &mut T)
-        where F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>)
-        {
-            update_call(data, UpdateState::Before, Some(&self.libs[index]));
-            self.remove_lib(index);
+    fn reload_lib<F, T>(
+        &mut self,
+        index: usize,
+        file_path: &PathBuf,
+        ref update_call: F,
+        data: &mut T,
+    ) where
+        F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
+    {
+        update_call(data, UpdateState::Before, Some(&self.libs[index]));
+        self.remove_lib(index);
 
-            match Self::load_library(self, file_path) {
-                Ok(lib) => {
-                    self.libs.push(lib.clone());
-                    update_call(data, UpdateState::After, Some(&lib));
-                }
+        match Self::load_library(self, file_path) {
+            Ok(lib) => {
+                self.libs.push(lib.clone());
+                update_call(data, UpdateState::After, Some(&lib));
+            }
 
-                Err(err) => {
-                    update_call(data, UpdateState::ReloadFailed(err), None);
-                    //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
-                }
+            Err(err) => {
+                update_call(data, UpdateState::ReloadFailed(err), None);
+                //println!("Unable to reload lib {:?} err {:?}", file_path, err); // Removed due to move in previous line
             }
         }
+    }
 
-
-    fn try_load_library(&self,
-                        name: &str,
-                        name_format: PlatformName)
-        -> Result<Arc<Lib>> {
-            match Self::search_dirs(self, name, name_format) {
-                Some(path) => Self::load_library(self, &path),
-                None => Err(Error::Find(name.into())),
-            }
+    fn try_load_library(&self, name: &str, name_format: PlatformName) -> Result<Arc<Lib>> {
+        match Self::search_dirs(self, name, name_format) {
+            Some(path) => Self::load_library(self, &path),
+            None => Err(Error::Find(name.into())),
         }
-
+    }
 
     fn load_library(&self, full_path: &PathBuf) -> Result<Arc<Lib>> {
         let path;
@@ -305,14 +297,12 @@ impl<'a> DynamicReload {
 
     fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Arc<Lib>> {
         match Library::new(&path) {
-            Ok(l) => {
-                Ok(Arc::new(Lib {
-                    original_path: org_path,
-                    loaded_path: path,
-                    lib: l,
-                }))
-            }
-            Err(e) => Err(Error::Load(e))
+            Ok(l) => Ok(Arc::new(Lib {
+                original_path: org_path,
+                loaded_path: path,
+                lib: l,
+            })),
+            Err(e) => Err(Error::Load(e)),
         }
     }
 
@@ -386,15 +376,13 @@ impl<'a> DynamicReload {
 
     fn get_temp_dir(shadow_dir: Option<&str>) -> Option<TempDir> {
         match shadow_dir {
-            Some(dir) => {
-                match TempDir::new_in(dir, "shadow_libs") {
-                    Ok(td) => Some(td),
-                    Err(er) => {
-                        println!("Unable to create tempdir {}", er);
-                        None
-                    }
+            Some(dir) => match TempDir::new_in(dir, "shadow_libs") {
+                Ok(td) => Some(td),
+                Err(er) => {
+                    println!("Unable to create tempdir {}", er);
+                    None
                 }
-            }
+            },
             _ => None,
         }
     }
@@ -425,7 +413,7 @@ impl<'a> DynamicReload {
                 if len > 0 {
                     // ignore copy errors, library file might be locked by the compiler
                     match fs::copy(&src, &dest) {
-                        Ok(_)  => return Ok(()),
+                        Ok(_) => return Ok(()),
                         Err(_) => (),
                     };
                 }
@@ -441,9 +429,11 @@ impl<'a> DynamicReload {
         match notify::watcher(tx, Duration::from_secs(2)) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
-                println!("Unable to create file watcher, no dynamic reloading will be done, \
-                          error: {:?}",
-                          e);
+                println!(
+                    "Unable to create file watcher, no dynamic reloading will be done, \
+                     error: {:?}",
+                    e
+                );
                 None
             }
         }
@@ -451,10 +441,13 @@ impl<'a> DynamicReload {
 
     fn get_search_paths(search_paths: Option<Vec<&str>>) -> Vec<PathBuf> {
         match search_paths {
-            Some(paths) => paths.iter().map(|p| {
-                let path_buf = Path::new(p).to_path_buf();
-                path_buf.canonicalize().unwrap_or(path_buf)
-            }).collect(),
+            Some(paths) => paths
+                .iter()
+                .map(|p| {
+                    let path_buf = Path::new(p).to_path_buf();
+                    path_buf.canonicalize().unwrap_or(path_buf)
+                })
+                .collect(),
             None => Vec::new(),
         }
     }
@@ -473,12 +466,12 @@ impl<'a> DynamicReload {
 
         #[cfg(not(feature = "no-unload"))]
         self.libs.swap_remove(idx);
-
     }
 
     #[cfg(not(feature = "no-timestamps"))]
     fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
-        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards");
         let filename = full_path.file_name().unwrap();
         shadow_dir.join(format!("{}_{}", ts.as_millis(), filename.to_str().unwrap()))
@@ -490,26 +483,28 @@ impl<'a> DynamicReload {
     }
 
     /// Formats dll name on Windows ("test_foo" -> "test_foo.dll")
-    #[cfg(target_os="windows")]
+    #[cfg(target_os = "windows")]
     fn get_dynamiclib_name(name: &str) -> String {
         format!("{}.dll", name)
     }
 
     /// Formats dll name on Mac ("test_foo" -> "libtest_foo.dylib")
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     fn get_dynamiclib_name(name: &str) -> String {
         format!("lib{}.dylib", name)
     }
 
     /// Formats dll name on *nix ("test_foo" -> "libtest_foo.so")
-    #[cfg(any(target_os="linux",
-              target_os="freebsd",
-              target_os="dragonfly",
-              target_os="netbsd",
-              target_os="openbsd"))]
-        fn get_dynamiclib_name(name: &str) -> String {
-            format!("lib{}.so", name)
-        }
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
+    fn get_dynamiclib_name(name: &str) -> String {
+        format!("lib{}.so", name)
+    }
 }
 
 impl PartialEq for Lib {
@@ -522,17 +517,16 @@ impl PartialEq for Lib {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc::channel;
-    use std::path::{Path, PathBuf};
     use std::env;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::sync::mpsc::channel;
+    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
-    use std::sync::Arc;
-    use std::fs;
 
     #[derive(Default)]
     struct TestNotifyCallback {
@@ -545,8 +539,8 @@ mod tests {
         fn update_call(&mut self, state: UpdateState, _lib: Option<&Arc<Lib>>) {
             match state {
                 UpdateState::Before => self.update_call_done = true,
-                UpdateState::After => self.after_update_done  = true,
-                UpdateState::ReloadFailed(_) => self.fail_update_done  = true,
+                UpdateState::After => self.after_update_done = true,
+                UpdateState::ReloadFailed(_) => self.fail_update_done = true,
             }
         }
     }
@@ -565,8 +559,10 @@ mod tests {
 
     #[test]
     fn test_search_paths_some() {
-        assert_eq!(DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
-        2);
+        assert_eq!(
+            DynamicReload::get_search_paths(Some(vec!["test", "test"])).len(),
+            2
+        );
     }
 
     #[test]
@@ -593,8 +589,10 @@ mod tests {
 
     #[test]
     fn test_is_file_fail() {
-        assert!(DynamicReload::is_file(&Path::new("haz_no_file_with_this_name").to_path_buf())
-                .is_none());
+        assert!(
+            DynamicReload::is_file(&Path::new("haz_no_file_with_this_name").to_path_buf())
+                .is_none()
+        );
     }
 
     #[test]
@@ -603,16 +601,20 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     fn test_get_library_name_mac() {
-        assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::Yes),
-        "libfoobar.dylib");
+        assert_eq!(
+            DynamicReload::get_library_name("foobar", PlatformName::Yes),
+            "libfoobar.dylib"
+        );
     }
 
     #[test]
     fn test_get_library_name() {
-        assert_eq!(DynamicReload::get_library_name("foobar", PlatformName::No),
-        "foobar");
+        assert_eq!(
+            DynamicReload::get_library_name("foobar", PlatformName::No),
+            "foobar"
+        );
     }
 
     #[test]
@@ -629,7 +631,9 @@ mod tests {
     #[test]
     fn test_add_library_fail() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("wont_find_this_lib", PlatformName::No).is_err());
+        assert!(dr
+            .add_library("wont_find_this_lib", PlatformName::No)
+            .is_err());
     }
 
     #[test]
@@ -706,7 +710,11 @@ mod tests {
         let test_file = DynamicReload::get_dynamiclib_name("test_file_2");
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
-        let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
+        let mut dr = DynamicReload::new(
+            Some(vec!["target/debug"]),
+            Some("target/debug"),
+            Search::Default,
+        );
 
         assert!(dr.shadow_dir.is_some());
 
@@ -745,7 +753,11 @@ mod tests {
 
     #[test]
     fn test_lib_equals_false() {
-        let mut dr = DynamicReload::new(Some(vec!["target/debug"]), Some("target/debug"), Search::Default);
+        let mut dr = DynamicReload::new(
+            Some(vec!["target/debug"]),
+            Some("target/debug"),
+            Search::Default,
+        );
         let target_path = get_test_shared_lib();
 
         let test_file = DynamicReload::get_dynamiclib_name("test_file_2");

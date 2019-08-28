@@ -1,8 +1,7 @@
 use std::error::Error as StdError;
-use std::io;
 use std::fmt;
+use std::io;
 use std::path::PathBuf;
-
 
 /// Errors that can be return from various operatiors
 ///
@@ -43,22 +42,22 @@ impl fmt::Display for Error {
     #[allow(deprecated)]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::Load(ref e) => {
-                write!(fmt,
-                       "{} {}\nDue to: {:?}",
-                       self.description(),
-                       e.description(),
-                       self.cause())
-            }
-            Error::Copy(ref e, ref src, ref dest) => {
-                write!(fmt,
-                       "{} {:?} to {:?}\n{}\nDue to: {:?}",
-                       self.description(),
-                       src,
-                       dest,
-                       e.description(),
-                       self.cause())
-            }
+            Error::Load(ref e) => write!(
+                fmt,
+                "{} {}\nDue to: {:?}",
+                self.description(),
+                e.description(),
+                self.cause()
+            ),
+            Error::Copy(ref e, ref src, ref dest) => write!(
+                fmt,
+                "{} {:?} to {:?}\n{}\nDue to: {:?}",
+                self.description(),
+                src,
+                dest,
+                e.description(),
+                self.cause()
+            ),
             Error::CopyTimeOut(ref src, ref dest) => {
                 write!(fmt, "{} {:?} to {:?}", self.description(), src, dest)
             }
