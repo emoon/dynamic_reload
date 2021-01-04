@@ -290,7 +290,7 @@ impl<'a> DynamicReload {
 
         if let Some(sd) = self.shadow_dir.as_ref() {
             path = Self::format_filename(sd.path(), full_path);
-            try!(Self::try_copy(&full_path, &path));
+            Self::try_copy(&full_path, &path)?;
             original_path = Some(full_path.clone());
         } else {
             original_path = None;

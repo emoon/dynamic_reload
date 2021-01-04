@@ -28,7 +28,7 @@ impl StdError for Error {
     }
 
     #[allow(deprecated)]
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             Error::Load(ref e) => e.cause(),
             Error::Copy(ref e, _, _) => e.cause(),
