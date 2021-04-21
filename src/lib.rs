@@ -114,6 +114,10 @@ impl<'a> DynamicReload {
     /// executable. Set this to ```Search::Backwards``` to allow that or to ```Search::Default```
     /// to only allow seach in the currenty directory of the of the executable
     ///
+    /// ```debounce_duration``` is the duration that the watcher will wait after the dynamic library
+    /// changed on disk, until it will cause a reload. (Multiple write calls could be made to the library
+    /// until it is fully written.)
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -130,11 +134,12 @@ impl<'a> DynamicReload {
         search_paths: Option<Vec<&'a str>>,
         shadow_dir: Option<&'a str>,
         _search: Search,
+        debounce_duration: Duration,
     ) -> DynamicReload {
         let (tx, rx) = channel();
         DynamicReload {
             libs: Vec::new(),
-            watcher: Self::get_watcher(tx),
+            watcher: Self::get_watcher(tx, debounce_duration),
             shadow_dir: Self::get_temp_dir(shadow_dir),
             watch_recv: rx,
             search_paths: Self::get_search_paths(search_paths),
@@ -425,8 +430,8 @@ impl<'a> DynamicReload {
         Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
-    fn get_watcher(tx: Sender<notify::DebouncedEvent>) -> Option<RecommendedWatcher> {
-        match notify::watcher(tx, Duration::from_secs(2)) {
+    fn get_watcher(tx: Sender<notify::DebouncedEvent>, debounce_duration: Duration) -> Option<RecommendedWatcher> {
+        match notify::watcher(tx, debounce_duration) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!(
@@ -569,7 +574,7 @@ mod tests {
     fn test_get_watcher() {
         let (tx, _) = channel();
         // We expect this to always work
-        assert!(DynamicReload::get_watcher(tx).is_some());
+        assert!(DynamicReload::get_watcher(tx, Duration::from_secs(2)).is_some());
     }
 
     #[test]
