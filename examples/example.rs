@@ -51,7 +51,7 @@ fn main() {
     );
 
     // test_shared is generated in build.rs
-    match reload_handler.add_library("test_shared", PlatformName::Yes) {
+    match unsafe { reload_handler.add_library("test_shared", PlatformName::Yes) } {
         Ok(lib) => plugs.add_plugin(&lib),
         Err(e) => {
             println!("Unable to load dynamic lib, err {:?}", e);
@@ -62,7 +62,9 @@ fn main() {
     // While this is running (printing a constant number) change return value in file src/test_shared.rs
     // build the project with cargo build and notice that this code will now return the new value
     loop {
-        reload_handler.update(Plugins::reload_callback, &mut plugs);
+        unsafe {
+            reload_handler.update(Plugins::reload_callback, &mut plugs);
+        }
 
         if plugs.plugins.len() > 0 {
             // In a real program you want to cache the symbol and not do it every time if your
