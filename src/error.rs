@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub enum Error {
     /// Loading a library failed
-    Load(io::Error),
+    Load(libloading::Error),
     /// File copy operation failed
     Copy(io::Error, PathBuf, PathBuf),
     /// Timeout of file copy happend.
