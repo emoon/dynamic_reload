@@ -22,4 +22,4 @@ jobs:
       run: cargo build
     - name: Run tests
       run: 
-        cargo test test_add_shared_update_fail_after -- --show-output
+        cargo test test -- --test-threads=1 --show-output
