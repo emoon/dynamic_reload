@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/emoon/dynamic_reload/workflows/rust/badge.svg)](https://github.com/emoon/dynamic_reload/actions?workflow=rust)
+[![Build Status] [![Build Status](https://github.com/emoon/dynamic_reload/workflows/Rust/badge.svg)](https://github.com/emoon/dynamic_reload/actions?workflow=Rust)
 [![Coverage Status](https://coveralls.io/repos/github/emoon/dynamic_reload/badge.svg?branch=master)](https://coveralls.io/github/emoon/dynamic_reload?branch=master) 
 [![Crates.io](https://img.shields.io/crates/v/dynamic_reload.svg)](https://crates.io/crates/dynamic_reload) 
 [![Documentation](https://docs.rs/dynamic_reload/badge.svg)](https://docs.rs/dynamic_reload)
