@@ -17,23 +17,25 @@
 //! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action.
 //! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 //!
-extern crate libc;
-extern crate libloading;
-extern crate notify;
-extern crate tempdir;
+//extern crate libloading;
+//extern crate notify;
+//extern crate tempdir;
 
 use libloading::Library;
 use notify::{RecommendedWatcher, Watcher};
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
-use tempdir::TempDir;
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 pub use libloading::Symbol;
+use tempdir::TempDir;
 
 mod error;
 pub use self::error::Error;
@@ -172,8 +174,19 @@ impl<'a> DynamicReload {
     /// // Add a library named test_lib and format it according to standard platform standard.
     /// add_library("test_lib", PlatformName::Yes)
     /// ```
+    /// # Safety
+    /// Note taken from libloading that is used for library loading
     ///
-    pub fn add_library(&mut self, name: &str, name_format: PlatformName) -> Result<Arc<Lib>> {
+    /// When a library is loaded, initialisation routines contained within it are executed.
+    /// For the purposes of safety, the execution of these routines is conceptually the same calling an unknown foreign function and may impose arbitrary requirements on the caller for the call to be sound.
+    /// Additionally, the callers of this function must also ensure that execution of the termination routines contained within
+    /// the library is safe as well. These routines may be executed when the library is unloaded.
+    ///
+    pub unsafe fn add_library(
+        &mut self,
+        name: &str,
+        name_format: PlatformName,
+    ) -> Result<Arc<Lib>> {
         match Self::try_load_library(self, name, name_format) {
             Ok(lib) => {
                 if let Some(w) = self.watcher.as_mut() {
@@ -196,6 +209,7 @@ impl<'a> DynamicReload {
         }
     }
 
+    ///
     ///
     /// Needs to be called in order to handle reloads of libraries.
     ///
@@ -224,8 +238,15 @@ impl<'a> DynamicReload {
     ///     dr.update(Plugin::reload_callback, &mut plugins);
     /// }
     /// ```
+    /// # Safety
+    /// Note taken from libloading that is used for library loading
     ///
-    pub fn update<F, T>(&mut self, ref update_call: F, data: &mut T)
+    /// When a library is loaded, initialisation routines contained within it are executed.
+    /// For the purposes of safety, the execution of these routines is conceptually the same calling an unknown foreign function and may impose arbitrary requirements on the caller for the call to be sound.
+    /// Additionally, the callers of this function must also ensure that execution of the termination routines contained within
+    /// the library is safe as well. These routines may be executed when the library is unloaded.
+    ///
+    pub unsafe fn update<F, T>(&mut self, update_call: &F, data: &mut T)
     where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
@@ -240,7 +261,7 @@ impl<'a> DynamicReload {
         }
     }
 
-    fn reload_libs<F, T>(&mut self, file_path: &PathBuf, ref update_call: F, data: &mut T)
+    unsafe fn reload_libs<F, T>(&mut self, file_path: &PathBuf, update_call: &F, data: &mut T)
     where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
@@ -252,11 +273,11 @@ impl<'a> DynamicReload {
         }
     }
 
-    fn reload_lib<F, T>(
+    unsafe fn reload_lib<F, T>(
         &mut self,
         index: usize,
         file_path: &PathBuf,
-        ref update_call: F,
+        update_call: &F,
         data: &mut T,
     ) where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
@@ -277,20 +298,20 @@ impl<'a> DynamicReload {
         }
     }
 
-    fn try_load_library(&self, name: &str, name_format: PlatformName) -> Result<Arc<Lib>> {
+    unsafe fn try_load_library(&self, name: &str, name_format: PlatformName) -> Result<Arc<Lib>> {
         match Self::search_dirs(self, name, name_format) {
             Some(path) => Self::load_library(self, &path),
             None => Err(Error::Find(name.into())),
         }
     }
 
-    fn load_library(&self, full_path: &PathBuf) -> Result<Arc<Lib>> {
+    unsafe fn load_library(&self, full_path: &PathBuf) -> Result<Arc<Lib>> {
         let path;
         let original_path;
 
         if let Some(sd) = self.shadow_dir.as_ref() {
             path = Self::format_filename(sd.path(), full_path);
-            Self::try_copy(&full_path, &path)?;
+            Self::try_copy(full_path, &path)?;
             original_path = Some(full_path.clone());
         } else {
             original_path = None;
@@ -300,7 +321,7 @@ impl<'a> DynamicReload {
         Self::init_library(original_path, path)
     }
 
-    fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Arc<Lib>> {
+    unsafe fn init_library(org_path: Option<PathBuf>, path: PathBuf) -> Result<Arc<Lib>> {
         match Library::new(&path) {
             Ok(l) => Ok(Arc::new(Lib {
                 original_path: org_path,
@@ -311,7 +332,7 @@ impl<'a> DynamicReload {
         }
     }
 
-    fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
+    fn should_reload(reload_path: &Path, lib: &Lib) -> bool {
         if let Some(p) = lib.original_path.as_ref() {
             // Check if file names match.
             if reload_path.file_name() == p.file_name() {
@@ -354,14 +375,11 @@ impl<'a> DynamicReload {
         None
     }
 
-    fn get_parent_dir(path: &PathBuf) -> Option<PathBuf> {
-        match path.parent() {
-            Some(p) => Some(p.to_path_buf()),
-            _ => None,
-        }
+    fn get_parent_dir(path: &Path) -> Option<PathBuf> {
+        path.parent().map(|p| p.to_path_buf())
     }
 
-    fn search_backwards_from_file(path: &PathBuf, lib_name: &String) -> Option<PathBuf> {
+    fn search_backwards_from_file(path: &Path, lib_name: &String) -> Option<PathBuf> {
         match Self::get_parent_dir(path) {
             Some(p) => {
                 let new_path = Path::new(&p).join(lib_name);
@@ -375,7 +393,7 @@ impl<'a> DynamicReload {
     }
 
     fn search_backwards_from_exe(lib_name: &String) -> Option<PathBuf> {
-        let exe_path = env::current_exe().unwrap_or(PathBuf::new());
+        let exe_path = env::current_exe().unwrap_or_default();
         Self::search_backwards_from_file(&exe_path, lib_name)
     }
 
@@ -417,10 +435,9 @@ impl<'a> DynamicReload {
                 let len = file.len();
                 if len > 0 {
                     // ignore copy errors, library file might be locked by the compiler
-                    match fs::copy(&src, &dest) {
-                        Ok(_) => return Ok(()),
-                        Err(_) => (),
-                    };
+                    if fs::copy(&src, &dest).is_ok() {
+                        return Ok(());
+                    }
                 }
             }
 
@@ -474,7 +491,7 @@ impl<'a> DynamicReload {
     }
 
     #[cfg(not(feature = "no-timestamps"))]
-    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+    fn format_filename(shadow_dir: &Path, full_path: &Path) -> PathBuf {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards");
@@ -517,9 +534,11 @@ impl PartialEq for Lib {
         self.original_path == other.original_path
     }
 
+    /*
     fn ne(&self, other: &Lib) -> bool {
         self.original_path != other.original_path
     }
+    */
 }
 
 #[cfg(test)]
@@ -636,27 +655,35 @@ mod tests {
     #[test]
     fn test_add_library_fail() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr
-            .add_library("wont_find_this_lib", PlatformName::No)
-            .is_err());
+        unsafe {
+            assert!(dr
+                .add_library("wont_find_this_lib", PlatformName::No)
+                .is_err());
+        }
     }
 
     #[test]
     fn test_add_shared_lib_ok() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        unsafe {
+            assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        }
     }
 
     #[test]
     fn test_add_shared_lib_search_paths() {
         let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
-        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        unsafe {
+            assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        }
     }
 
     #[test]
     fn test_add_shared_lib_fail_load() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        assert!(dr.add_library("Cargo.toml", PlatformName::No).is_err());
+        unsafe {
+            assert!(dr.add_library("Cargo.toml", PlatformName::No).is_err());
+        }
     }
 
     #[test]
@@ -677,13 +704,16 @@ mod tests {
         let path1 = "../..".to_owned();
         let path2 = "../test".to_owned();
         let mut dr = DynamicReload::new(Some(vec![&path1, &path2]), None, Search::Default);
-        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        unsafe {
+            assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        }
     }
 
     #[test]
     fn test_add_shared_update() {
         let mut notify_callback = TestNotifyCallback::default();
         let target_path = get_test_shared_lib();
+
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
         let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
@@ -692,10 +722,14 @@ mod tests {
 
         fs::copy(&target_path, &dest_path).unwrap();
 
-        assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        unsafe {
+            assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
+        }
 
         for i in 0..10 {
-            dr.update(TestNotifyCallback::update_call, &mut notify_callback);
+            unsafe {
+                dr.update(&TestNotifyCallback::update_call, &mut notify_callback);
+            }
 
             if i == 2 {
                 fs::copy(&dest_path, &target_path).unwrap();
@@ -730,10 +764,14 @@ mod tests {
         // Wait a while before open the file. Not sure why this is needed.
         thread::sleep(Duration::from_millis(100));
 
-        assert!(dr.add_library(&test_file, PlatformName::No).is_ok());
+        unsafe {
+            assert!(dr.add_library(&test_file, PlatformName::No).is_ok());
+        }
 
         for i in 0..10 {
-            dr.update(TestNotifyCallback::update_call, &mut notify_callback);
+            unsafe {
+                dr.update(&TestNotifyCallback::update_call, &mut notify_callback);
+            }
 
             if i == 2 {
                 // Copy a non-shared lib to test the lib handles a broken "lib"
@@ -751,7 +789,7 @@ mod tests {
     #[test]
     fn test_lib_equals_true() {
         let mut dr = DynamicReload::new(None, None, Search::Default);
-        let lib = dr.add_library("test_shared", PlatformName::Yes).unwrap();
+        let lib = unsafe { dr.add_library("test_shared", PlatformName::Yes).unwrap() };
         let lib2 = lib.clone();
         assert!(lib == lib2);
     }
@@ -773,8 +811,8 @@ mod tests {
         let _ = DynamicReload::try_copy(&target_path, &dest_path);
         thread::sleep(Duration::from_millis(100));
 
-        let lib0 = dr.add_library(&test_file, PlatformName::No).unwrap();
-        let lib1 = dr.add_library("test_shared", PlatformName::Yes).unwrap();
+        let lib0 = unsafe { dr.add_library(&test_file, PlatformName::No).unwrap() };
+        let lib1 = unsafe { dr.add_library("test_shared", PlatformName::Yes).unwrap() };
 
         assert!(lib0 != lib1);
     }

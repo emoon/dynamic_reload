@@ -1,6 +1,6 @@
 [package]
 name = "dynamic_reload"
-version = "0.4.0"
+version = "0.7.0"
 license = "MIT/Apache-2.0"
 authors = ["Daniel Collin <daniel@collin.com>"]
 description = "Cross-platform dynamic reloading of shared libraries"
@@ -9,6 +9,7 @@ repository = "https://github.com/emoon/dynamic_reload"
 homepage = "https://github.com/emoon/dynamic_reload"
 documentation = "http://prodbg.com/dynamic_reload/dynamic_reload/index.html"
 build = "build.rs"
+edition = "2021"
 
 [features]
 # Don't add timestamps to shadow copy.
@@ -19,7 +20,5 @@ no-unload = []
 
 [dependencies]
 notify = "4.0.*"
-libc = "0.2.0"
-libloading = "0.5.*"
+libloading = "0.7.*"
 tempdir = "0.3"
-
