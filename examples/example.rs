@@ -48,6 +48,7 @@ fn main() {
         Some(vec!["target/debug"]),
         Some("target/debug"),
         Search::Default,
+        Duration::from_secs(2),
     );
 
     // test_shared is generated in build.rs

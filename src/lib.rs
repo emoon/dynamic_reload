@@ -116,27 +116,32 @@ impl<'a> DynamicReload {
     /// executable. Set this to ```Search::Backwards``` to allow that or to ```Search::Default```
     /// to only allow seach in the currenty directory of the of the executable
     ///
+    /// ```debounce_duration``` is the duration that the watcher will wait after the dynamic library
+    /// changed on disk, until it will cause a reload. (Multiple write calls could be made to the library
+    /// until it is fully written.)
+    ///
     /// # Examples
     ///
     /// ```ignore
     /// // No extra search paths, temp directory in target/debug, allow search backwards
-    /// DynamicReload::new(None, Some("target/debug"), Search::Backwards);
+    /// DynamicReload::new(None, Some("target/debug"), Search::Backwards, Duration::from_secs(2));
     /// ```
     ///
     /// ```ignore
     /// // "../.." extra search path, temp directory in target/debug, allow search backwards
-    /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards);
+    /// DynamicReload::new(Some(vec!["../.."]), Some("target/debug"), Search::Backwards, Duration::from_secs(2));
     /// ```
     ///
     pub fn new(
         search_paths: Option<Vec<&'a str>>,
         shadow_dir: Option<&'a str>,
         _search: Search,
+        debounce_duration: Duration,
     ) -> DynamicReload {
         let (tx, rx) = channel();
         DynamicReload {
             libs: Vec::new(),
-            watcher: Self::get_watcher(tx),
+            watcher: Self::get_watcher(tx, debounce_duration),
             shadow_dir: Self::get_temp_dir(shadow_dir),
             watch_recv: rx,
             search_paths: Self::get_search_paths(search_paths),
@@ -228,7 +233,7 @@ impl<'a> DynamicReload {
     ///
     /// fn main() {
     ///     let plugins = Plugins { ... };
-    ///     let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Backwards);
+    ///     let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Backwards, Duration::from_secs(2));
     ///     dr.add_library("test_shared", Search::Backwards);
     ///     dr.update(Plugin::reload_callback, &mut plugins);
     /// }
@@ -442,8 +447,11 @@ impl<'a> DynamicReload {
         Err(Error::CopyTimeOut(src.to_path_buf(), dest.to_path_buf()))
     }
 
-    fn get_watcher(tx: Sender<notify::DebouncedEvent>) -> Option<RecommendedWatcher> {
-        match notify::watcher(tx, Duration::from_secs(2)) {
+    fn get_watcher(
+        tx: Sender<notify::DebouncedEvent>,
+        debounce_duration: Duration,
+    ) -> Option<RecommendedWatcher> {
+        match notify::watcher(tx, debounce_duration) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!(
@@ -588,7 +596,7 @@ mod tests {
     fn test_get_watcher() {
         let (tx, _) = channel();
         // We expect this to always work
-        assert!(DynamicReload::get_watcher(tx).is_some());
+        assert!(DynamicReload::get_watcher(tx, Duration::from_secs(2)).is_some());
     }
 
     #[test]
@@ -649,7 +657,7 @@ mod tests {
 
     #[test]
     fn test_add_library_fail() {
-        let mut dr = DynamicReload::new(None, None, Search::Default);
+        let mut dr = DynamicReload::new(None, None, Search::Default, Duration::from_secs(2));
         unsafe {
             assert!(dr
                 .add_library("wont_find_this_lib", PlatformName::No)
@@ -659,7 +667,7 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_ok() {
-        let mut dr = DynamicReload::new(None, None, Search::Default);
+        let mut dr = DynamicReload::new(None, None, Search::Default, Duration::from_secs(2));
         unsafe {
             assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
         }
@@ -667,7 +675,12 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_search_paths() {
-        let mut dr = DynamicReload::new(Some(vec!["../..", "../test"]), None, Search::Default);
+        let mut dr = DynamicReload::new(
+            Some(vec!["../..", "../test"]),
+            None,
+            Search::Default,
+            Duration::from_secs(2),
+        );
         unsafe {
             assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
         }
@@ -675,7 +688,7 @@ mod tests {
 
     #[test]
     fn test_add_shared_lib_fail_load() {
-        let mut dr = DynamicReload::new(None, None, Search::Default);
+        let mut dr = DynamicReload::new(None, None, Search::Default, Duration::from_secs(2));
         unsafe {
             assert!(dr.add_library("Cargo.toml", PlatformName::No).is_err());
         }
@@ -683,14 +696,24 @@ mod tests {
 
     #[test]
     fn test_add_shared_shadow_dir_ok() {
-        let dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
+        let dr = DynamicReload::new(
+            None,
+            Some("target/debug"),
+            Search::Default,
+            Duration::from_secs(2),
+        );
         assert!(dr.shadow_dir.is_some());
     }
 
     #[test]
     fn test_add_shared_string_arg_ok() {
         let shadow_dir_string = "target/debug".to_owned();
-        let dr = DynamicReload::new(None, Some(&shadow_dir_string), Search::Default);
+        let dr = DynamicReload::new(
+            None,
+            Some(&shadow_dir_string),
+            Search::Default,
+            Duration::from_secs(2),
+        );
         assert!(dr.shadow_dir.is_some());
     }
 
@@ -698,7 +721,12 @@ mod tests {
     fn test_add_shared_lib_search_paths_strings() {
         let path1 = "../..".to_owned();
         let path2 = "../test".to_owned();
-        let mut dr = DynamicReload::new(Some(vec![&path1, &path2]), None, Search::Default);
+        let mut dr = DynamicReload::new(
+            Some(vec![&path1, &path2]),
+            None,
+            Search::Default,
+            Duration::from_secs(2),
+        );
         unsafe {
             assert!(dr.add_library("test_shared", PlatformName::Yes).is_ok());
         }
@@ -711,7 +739,12 @@ mod tests {
 
         let mut dest_path = Path::new(&target_path).to_path_buf();
 
-        let mut dr = DynamicReload::new(None, Some("target/debug"), Search::Default);
+        let mut dr = DynamicReload::new(
+            None,
+            Some("target/debug"),
+            Search::Default,
+            Duration::from_secs(2),
+        );
 
         dest_path.set_file_name("test_file");
 
@@ -748,6 +781,7 @@ mod tests {
             Some(vec!["target/debug"]),
             Some("target/debug"),
             Search::Default,
+            Duration::from_secs(2),
         );
 
         assert!(dr.shadow_dir.is_some());
@@ -783,7 +817,7 @@ mod tests {
 
     #[test]
     fn test_lib_equals_true() {
-        let mut dr = DynamicReload::new(None, None, Search::Default);
+        let mut dr = DynamicReload::new(None, None, Search::Default, Duration::from_secs(2));
         let lib = unsafe { dr.add_library("test_shared", PlatformName::Yes).unwrap() };
         let lib2 = lib.clone();
         assert!(lib == lib2);
@@ -795,6 +829,7 @@ mod tests {
             Some(vec!["target/debug"]),
             Some("target/debug"),
             Search::Default,
+            Duration::from_secs(2),
         );
         let target_path = get_test_shared_lib();
 
