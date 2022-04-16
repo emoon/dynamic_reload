@@ -561,7 +561,6 @@ mod tests {
 
     impl TestNotifyCallback {
         fn update_call(&mut self, state: UpdateState, _lib: Option<&Arc<Lib>>) {
-            println!("update call...");
             match state {
                 UpdateState::Before => self.update_call_done = true,
                 UpdateState::After => self.after_update_done = true,
@@ -801,7 +800,6 @@ mod tests {
             }
 
             if i == 2 {
-                println!("Updating file...");
                 // Copy a non-shared lib to test the lib handles a broken "lib"
                 fs::copy("Cargo.toml", &dest_path).unwrap();
             }
