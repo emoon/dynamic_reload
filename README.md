@@ -1,4 +1,7 @@
-# dynamic_reload [![Build Status](https://travis-ci.org/emoon/dynamic_reload.svg?branch=master)](https://travis-ci.org/emoon/dynamic_reload) [![Build status](https://ci.appveyor.com/api/projects/status/cblu63ub2sqntr9w?svg=true)](https://ci.appveyor.com/project/emoon/dynamic-reload) [![Coverage Status](https://coveralls.io/repos/github/emoon/dynamic_reload/badge.svg?branch=master)](https://coveralls.io/github/emoon/dynamic_reload?branch=master) [![Crates.io](https://img.shields.io/crates/v/dynamic_reload.svg)](https://crates.io/crates/dynamic_reload) [![Documentation](https://docs.rs/dynamic_reload/badge.svg)](https://docs.rs/dynamic_reload)
+[![Build Status](https://github.com/emoon/dynamic_reload/workflows/Rust/badge.svg)](https://github.com/emoon/dynamic_reload/actions?workflow=RUst)
+[![Coverage Status](https://coveralls.io/repos/github/emoon/dynamic_reload/badge.svg?branch=master)](https://coveralls.io/github/emoon/dynamic_reload?branch=master) 
+[![Crates.io](https://img.shields.io/crates/v/dynamic_reload.svg)](https://crates.io/crates/dynamic_reload) 
+[![Documentation](https://docs.rs/dynamic_reload/badge.svg)](https://docs.rs/dynamic_reload)
 
 dynamic_reload is a cross platform library written in [Rust](https://www.rust-lang.org) that makes it easier to do reloading of shared libraries (dll:s on windows, .so on *nix, .dylib on Mac, etc). The intended use is to allow applications to reload code on the fly without closing down the application when some code changes. This can be seen as a lite version of "live" coding for Rust. It's worth to mention here that reloading of shared libraries isn't limited to libraries written in Rust but can be done in any language that can target shared libraries. A typical scenario can look like this:
 
