@@ -19,7 +19,7 @@ Usage
 ```toml
 # Cargo.toml
 [dependencies]
-dynamic_reload = "0.7.0"
+dynamic_reload = "0.8.0"
 
 ```
 
@@ -78,7 +78,8 @@ fn main() {
     // will lock the file so we can't overwrite it so this works around that issue.
     let mut reload_handler = DynamicReload::new(Some(vec!["target/debug"]),
                                                 Some("target/debug"),
-                                                Search::Default);
+                                                Search::Default,
+                                                Duration::from_sec(2));
 
     // test_shared is generated in build.rs
     match reload_handler.add_library("test_shared", PlatformName::Yes) {

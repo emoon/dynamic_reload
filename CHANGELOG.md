@@ -2,6 +2,11 @@
 
 This project follows semantic versioning.
 
+### v0.8.0 (2022-04-16)
+
+- [changed] - API BREAKAGE: Now `DynamicReload::new` takes an extra parameter which is how often to check for ranges (recommended is 2 sec)
+- [changed] - Clippy warnings, editions and various cleanup
+
 ### v0.4.0 (2019-08-28)
 
 - [changed] - Use Arc instead of Rc to make create more MT friendly.
