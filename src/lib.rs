@@ -17,10 +17,9 @@
 //! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action.
 //! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 //!
-extern crate libc;
-extern crate libloading;
-extern crate notify;
-extern crate tempdir;
+//extern crate libloading;
+//extern crate notify;
+//extern crate tempdir;
 
 use libloading::Library;
 use notify::{RecommendedWatcher, Watcher};
@@ -32,6 +31,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tempdir::TempDir;
+use notify;
 
 pub use libloading::Symbol;
 
