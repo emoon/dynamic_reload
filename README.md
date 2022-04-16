@@ -18,12 +18,8 @@ Usage
 
 ```toml
 # Cargo.toml
-[lib]
-name = "test_shared"
-crate-type = ["dylib"]
-
 [dependencies]
-dynamic_reload = "0.4.0"
+dynamic_reload = "0.6.0"
 
 ```
 
