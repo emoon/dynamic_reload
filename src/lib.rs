@@ -17,9 +17,6 @@
 //! Foo will be getting a callback from dynamic_reload before Bar is reloaded and that allows Foo to take needed action.
 //! Then another call will be made after Bar has been reloaded to allow Foo to restore state for Bar if needed.
 //!
-//extern crate libloading;
-//extern crate notify;
-//extern crate tempdir;
 
 use libloading::Library;
 use notify::{RecommendedWatcher, Watcher};
@@ -564,6 +561,7 @@ mod tests {
 
     impl TestNotifyCallback {
         fn update_call(&mut self, state: UpdateState, _lib: Option<&Arc<Lib>>) {
+            println!("update call...");
             match state {
                 UpdateState::Before => self.update_call_done = true,
                 UpdateState::After => self.after_update_done = true,
@@ -743,7 +741,7 @@ mod tests {
             None,
             Some("target/debug"),
             Search::Default,
-            Duration::from_secs(2),
+            Duration::from_secs(1),
         );
 
         dest_path.set_file_name("test_file");
@@ -763,7 +761,7 @@ mod tests {
                 fs::copy(&dest_path, &target_path).unwrap();
             }
 
-            thread::sleep(Duration::from_millis(50));
+            thread::sleep(Duration::from_millis(200));
         }
 
         assert!(notify_callback.update_call_done);
@@ -781,7 +779,7 @@ mod tests {
             Some(vec!["target/debug"]),
             Some("target/debug"),
             Search::Default,
-            Duration::from_secs(2),
+            Duration::from_secs(1),
         );
 
         assert!(dr.shadow_dir.is_some());
@@ -791,7 +789,7 @@ mod tests {
         let _ = DynamicReload::try_copy(&target_path, &dest_path);
 
         // Wait a while before open the file. Not sure why this is needed.
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(2000));
 
         unsafe {
             assert!(dr.add_library(&test_file, PlatformName::No).is_ok());
@@ -803,11 +801,12 @@ mod tests {
             }
 
             if i == 2 {
+                println!("Updating file...");
                 // Copy a non-shared lib to test the lib handles a broken "lib"
                 fs::copy("Cargo.toml", &dest_path).unwrap();
             }
 
-            thread::sleep(Duration::from_millis(50));
+            thread::sleep(Duration::from_millis(200));
         }
 
         assert_eq!(notify_callback.update_call_done, true);
