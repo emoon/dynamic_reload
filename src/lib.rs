@@ -23,17 +23,19 @@
 
 use libloading::Library;
 use notify::{RecommendedWatcher, Watcher};
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
-use tempdir::TempDir;
-use notify;
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
 
 pub use libloading::Symbol;
+use tempdir::TempDir;
 
 mod error;
 pub use self::error::Error;
@@ -167,6 +169,13 @@ impl<'a> DynamicReload {
     /// // Add a library named test_lib and format it according to standard platform standard.
     /// add_library("test_lib", PlatformName::Yes)
     /// ```
+    /// # Safety
+    /// Note taken from libloading that is used for library loading
+    ///
+    /// When a library is loaded, initialisation routines contained within it are executed.
+    /// For the purposes of safety, the execution of these routines is conceptually the same calling an unknown foreign function and may impose arbitrary requirements on the caller for the call to be sound.
+    /// Additionally, the callers of this function must also ensure that execution of the termination routines contained within
+    /// the library is safe as well. These routines may be executed when the library is unloaded.
     ///
     pub unsafe fn add_library(
         &mut self,
@@ -196,6 +205,7 @@ impl<'a> DynamicReload {
     }
 
     ///
+    ///
     /// Needs to be called in order to handle reloads of libraries.
     ///
     /// ```update_call``` function with its data needs to be supplied to allow the application to
@@ -223,8 +233,15 @@ impl<'a> DynamicReload {
     ///     dr.update(Plugin::reload_callback, &mut plugins);
     /// }
     /// ```
+    /// # Safety
+    /// Note taken from libloading that is used for library loading
     ///
-    pub unsafe fn update<F, T>(&mut self, ref update_call: F, data: &mut T)
+    /// When a library is loaded, initialisation routines contained within it are executed.
+    /// For the purposes of safety, the execution of these routines is conceptually the same calling an unknown foreign function and may impose arbitrary requirements on the caller for the call to be sound.
+    /// Additionally, the callers of this function must also ensure that execution of the termination routines contained within
+    /// the library is safe as well. These routines may be executed when the library is unloaded.
+    ///
+    pub unsafe fn update<F, T>(&mut self, update_call: &F, data: &mut T)
     where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
@@ -239,7 +256,7 @@ impl<'a> DynamicReload {
         }
     }
 
-    unsafe fn reload_libs<F, T>(&mut self, file_path: &PathBuf, ref update_call: F, data: &mut T)
+    unsafe fn reload_libs<F, T>(&mut self, file_path: &PathBuf, update_call: &F, data: &mut T)
     where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
@@ -255,7 +272,7 @@ impl<'a> DynamicReload {
         &mut self,
         index: usize,
         file_path: &PathBuf,
-        ref update_call: F,
+        update_call: &F,
         data: &mut T,
     ) where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
@@ -289,7 +306,7 @@ impl<'a> DynamicReload {
 
         if let Some(sd) = self.shadow_dir.as_ref() {
             path = Self::format_filename(sd.path(), full_path);
-            Self::try_copy(&full_path, &path)?;
+            Self::try_copy(full_path, &path)?;
             original_path = Some(full_path.clone());
         } else {
             original_path = None;
@@ -310,7 +327,7 @@ impl<'a> DynamicReload {
         }
     }
 
-    fn should_reload(reload_path: &PathBuf, lib: &Lib) -> bool {
+    fn should_reload(reload_path: &Path, lib: &Lib) -> bool {
         if let Some(p) = lib.original_path.as_ref() {
             // Check if file names match.
             if reload_path.file_name() == p.file_name() {
@@ -353,14 +370,11 @@ impl<'a> DynamicReload {
         None
     }
 
-    fn get_parent_dir(path: &PathBuf) -> Option<PathBuf> {
-        match path.parent() {
-            Some(p) => Some(p.to_path_buf()),
-            _ => None,
-        }
+    fn get_parent_dir(path: &Path) -> Option<PathBuf> {
+        path.parent().map(|p| p.to_path_buf())
     }
 
-    fn search_backwards_from_file(path: &PathBuf, lib_name: &String) -> Option<PathBuf> {
+    fn search_backwards_from_file(path: &Path, lib_name: &String) -> Option<PathBuf> {
         match Self::get_parent_dir(path) {
             Some(p) => {
                 let new_path = Path::new(&p).join(lib_name);
@@ -374,7 +388,7 @@ impl<'a> DynamicReload {
     }
 
     fn search_backwards_from_exe(lib_name: &String) -> Option<PathBuf> {
-        let exe_path = env::current_exe().unwrap_or(PathBuf::new());
+        let exe_path = env::current_exe().unwrap_or_default();
         Self::search_backwards_from_file(&exe_path, lib_name)
     }
 
@@ -416,10 +430,9 @@ impl<'a> DynamicReload {
                 let len = file.len();
                 if len > 0 {
                     // ignore copy errors, library file might be locked by the compiler
-                    match fs::copy(&src, &dest) {
-                        Ok(_) => return Ok(()),
-                        Err(_) => (),
-                    };
+                    if fs::copy(&src, &dest).is_ok() {
+                        return Ok(());
+                    }
                 }
             }
 
@@ -473,7 +486,7 @@ impl<'a> DynamicReload {
     }
 
     #[cfg(not(feature = "no-timestamps"))]
-    fn format_filename(shadow_dir: &Path, full_path: &PathBuf) -> PathBuf {
+    fn format_filename(shadow_dir: &Path, full_path: &Path) -> PathBuf {
         let ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards");
@@ -516,9 +529,11 @@ impl PartialEq for Lib {
         self.original_path == other.original_path
     }
 
+    /*
     fn ne(&self, other: &Lib) -> bool {
         self.original_path != other.original_path
     }
+    */
 }
 
 #[cfg(test)]
@@ -708,7 +723,7 @@ mod tests {
 
         for i in 0..10 {
             unsafe {
-                dr.update(TestNotifyCallback::update_call, &mut notify_callback);
+                dr.update(&TestNotifyCallback::update_call, &mut notify_callback);
             }
 
             if i == 2 {
@@ -750,7 +765,7 @@ mod tests {
 
         for i in 0..10 {
             unsafe {
-                dr.update(TestNotifyCallback::update_call, &mut notify_callback);
+                dr.update(&TestNotifyCallback::update_call, &mut notify_callback);
             }
 
             if i == 2 {

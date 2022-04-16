@@ -63,7 +63,7 @@ fn main() {
     // build the project with cargo build and notice that this code will now return the new value
     loop {
         unsafe {
-            reload_handler.update(Plugins::reload_callback, &mut plugs);
+            reload_handler.update(&Plugins::reload_callback, &mut plugs);
         }
 
         if plugs.plugins.len() > 0 {
