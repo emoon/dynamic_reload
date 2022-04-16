@@ -552,7 +552,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
     struct TestNotifyCallback {
         update_call_done: bool,
         after_update_done: bool,
@@ -566,6 +566,8 @@ mod tests {
                 UpdateState::After => self.after_update_done = true,
                 UpdateState::ReloadFailed(_) => self.fail_update_done = true,
             }
+
+            println!("Update state {:?}", self);
         }
     }
 
@@ -795,6 +797,7 @@ mod tests {
         }
 
         for i in 0..10 {
+            println!("update {}", i);
             unsafe {
                 dr.update(&TestNotifyCallback::update_call, &mut notify_callback);
             }
