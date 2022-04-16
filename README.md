@@ -19,7 +19,7 @@ Usage
 ```toml
 # Cargo.toml
 [dependencies]
-dynamic_reload = "0.6.0"
+dynamic_reload = "0.7.0"
 
 ```
 
@@ -36,12 +36,8 @@ To actually test reloading of this example do the following
 ```
 
 ```rust
-extern crate dynamic_reload;
-
 use dynamic_reload::{DynamicReload, Lib, Symbol, Search, PlatformName, UpdateState};
-use std::sync::Arc;
-use std::time::Duration;
-use std::thread;
+use std::{sync::Arc, time::Duration, thread};
 
 struct Plugins {
     plugins: Vec<Arc<Lib>>,
