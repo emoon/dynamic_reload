@@ -785,7 +785,7 @@ mod tests {
 
         dest_path.set_file_name(&test_file);
 
-        let _ = DynamicReload::try_copy(&target_path, &dest_path);
+        DynamicReload::try_copy(&target_path, &dest_path).unwrap();
 
         // Wait a while before open the file. Not sure why this is needed.
         thread::sleep(Duration::from_millis(2000));
