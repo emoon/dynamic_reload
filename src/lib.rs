@@ -258,7 +258,7 @@ impl<'a> DynamicReload {
         }
     }
 
-    unsafe fn reload_libs<F, T>(&mut self, file_path: &PathBuf, update_call: &F, data: &mut T)
+    unsafe fn reload_libs<F, T>(&mut self, file_path: &Path, update_call: &F, data: &mut T)
     where
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
@@ -273,7 +273,7 @@ impl<'a> DynamicReload {
     unsafe fn reload_lib<F, T>(
         &mut self,
         index: usize,
-        file_path: &PathBuf,
+        file_path: &Path,
         update_call: &F,
         data: &mut T,
     ) where
@@ -302,17 +302,17 @@ impl<'a> DynamicReload {
         }
     }
 
-    unsafe fn load_library(&self, full_path: &PathBuf) -> Result<Arc<Lib>> {
+    unsafe fn load_library(&self, full_path: &Path) -> Result<Arc<Lib>> {
         let path;
         let original_path;
 
         if let Some(sd) = self.shadow_dir.as_ref() {
             path = Self::format_filename(sd.path(), full_path);
             Self::try_copy(full_path, &path)?;
-            original_path = Some(full_path.clone());
+            original_path = Some(full_path.to_path_buf());
         } else {
             original_path = None;
-            path = full_path.clone();
+            path = full_path.to_path_buf();
         }
 
         Self::init_library(original_path, path)
@@ -439,7 +439,7 @@ impl<'a> DynamicReload {
                 let len = file.len();
                 if len > 0 {
                     // ignore copy errors, library file might be locked by the compiler
-                    if fs::copy(&src, &dest).is_ok() {
+                    if fs::copy(src, dest).is_ok() {
                         return Ok(());
                     }
                 }
