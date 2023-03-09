@@ -21,4 +21,4 @@ no-unload = []
 [dependencies]
 notify = "4.0.*"
 libloading = "0.7.*"
-tempdir = "0.3"
+tempfile = "3"

@@ -32,7 +32,7 @@ use std::{
 };
 
 pub use libloading::Symbol;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 mod error;
 pub use self::error::Error;
@@ -396,10 +396,17 @@ impl<'a> DynamicReload {
 
     fn get_temp_dir(shadow_dir: Option<&str>) -> Option<TempDir> {
         match shadow_dir {
-            Some(dir) => match TempDir::new_in(dir, "shadow_libs") {
-                Ok(td) => Some(td),
-                Err(er) => {
-                    println!("Unable to create tempdir {}", er);
+            Some(dir) => match TempDir::new_in(dir) {
+                Ok(td) => {
+                    if !Path::exists(td.path()) {
+                        // TODO: Result
+                        println!("Unable to create tempdir in {}", dir);
+                        None
+                    } else {
+                        Some(td)
+                    }
+                }
+                Err(_er) => {
                     None
                 }
             },
