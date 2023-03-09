@@ -2,6 +2,10 @@
 
 This project follows semantic versioning.
 
+### v0.9.0 (2023-03-09)
+
+- [changed] - Switched from tempdir to tempfile due to security issues #25 
+
 ### v0.8.0 (2022-04-16)
 
 - [changed] - API BREAKAGE: Now `DynamicReload::new` takes an extra parameter which is how often to check for ranges (recommended is 2 sec)
