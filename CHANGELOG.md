@@ -2,6 +2,10 @@
 
 This project follows semantic versioning.
 
+### v0.10.0 (2023-03-10)
+
+- [changed] - Switched to new notify/debouncher API 
+
 ### v0.9.0 (2023-03-09)
 
 - [changed] - Switched from tempdir to tempfile due to security issues #25 
