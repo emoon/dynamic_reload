@@ -19,7 +19,7 @@
 //!
 
 use libloading::Library;
-use notify::{RecommendedWatcher, Watcher};
+use notify_debouncer_mini::{notify::*,new_debouncer,DebounceEventResult, Debouncer};
 use std::{
     env, fs,
     path::{Path, PathBuf},
@@ -53,10 +53,10 @@ pub struct Lib {
 /// Contains information about loaded libraries and also tracks search paths and reloading events.
 pub struct DynamicReload {
     libs: Vec<Arc<Lib>>,
-    watcher: Option<RecommendedWatcher>,
+    watcher: Option<Debouncer<RecommendedWatcher>>,
     shadow_dir: Option<TempDir>,
     search_paths: Vec<PathBuf>,
-    watch_recv: Receiver<notify::DebouncedEvent>,
+    watch_recv: Receiver<DebounceEventResult>,
 }
 
 /// Searching for a shared library can be done in current directory, but can also be allowed to
@@ -195,7 +195,7 @@ impl<'a> DynamicReload {
                             parent.to_path_buf()
                         };
 
-                        let _ = w.watch(parent_buf, notify::RecursiveMode::NonRecursive);
+                        let _ = w.watcher().watch(&parent_buf, RecursiveMode::NonRecursive);
                     }
                 }
                 // Bump the ref here as we keep one around to keep track of files that needs to be reloaded
@@ -248,10 +248,11 @@ impl<'a> DynamicReload {
         F: Fn(&mut T, UpdateState, Option<&Arc<Lib>>),
     {
         while let Ok(evt) = self.watch_recv.try_recv() {
-            use notify::DebouncedEvent::*;
             match evt {
-                NoticeWrite(ref path) | Write(ref path) | Create(ref path) => {
-                    Self::reload_libs(self, path, update_call, data);
+                Ok(events) => {
+                    for event in events {
+                        Self::reload_libs(self, &event.path, update_call, data);
+                    }
                 }
                 _ => (),
             }
@@ -452,10 +453,10 @@ impl<'a> DynamicReload {
     }
 
     fn get_watcher(
-        tx: Sender<notify::DebouncedEvent>,
+        tx: Sender<DebounceEventResult>,
         debounce_duration: Duration,
-    ) -> Option<RecommendedWatcher> {
-        match notify::watcher(tx, debounce_duration) {
+    ) -> Option<Debouncer<RecommendedWatcher>> {
+        match new_debouncer(debounce_duration, None, tx) {
             Ok(watcher) => Some(watcher),
             Err(e) => {
                 println!(

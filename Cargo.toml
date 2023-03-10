@@ -19,6 +19,6 @@ no-timestamps = []
 no-unload = []
 
 [dependencies]
-notify = "4.0.*"
+notify-debouncer-mini = "0.2.0"
 libloading = "0.7.*"
 tempfile = "3"
