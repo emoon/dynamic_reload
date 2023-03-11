@@ -23,13 +23,4 @@ jobs:
     - name: Run tests
       run: 
         cargo test test -- --test-threads=1 --show-output
-  macos_m1:
-    runs-on: [self-hosted, macOS, ARM64]
-    steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build
-    - name: Run tests
-      run: 
-        cargo test test -- --test-threads=1 --show-output
 
