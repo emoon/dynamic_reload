@@ -530,7 +530,8 @@ impl<'a> DynamicReload {
         target_os = "freebsd",
         target_os = "dragonfly",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "android"
     ))]
     fn get_dynamiclib_name(name: &str) -> String {
         format!("lib{}.so", name)
