@@ -20,5 +20,5 @@ no-unload = []
 
 [dependencies]
 notify-debouncer-mini = "0.2.0"
-libloading = "0.7.*"
+libloading = "0.8.*"
 tempfile = "3"
